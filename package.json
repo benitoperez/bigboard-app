@@ -9,7 +9,9 @@
     "lint": "eslint",
     "verify:rating": "tsx scripts/verify-rating.ts",
     "seed:dev": "tsx scripts/seed-dev.ts",
-    "verify:roster": "tsx scripts/verify-roster.ts"
+    "verify:roster": "tsx scripts/verify-roster.ts",
+    "verify:color": "tsx scripts/verify-color.ts",
+    "verify": "npm run verify:rating && npm run verify:roster && npm run verify:color"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",

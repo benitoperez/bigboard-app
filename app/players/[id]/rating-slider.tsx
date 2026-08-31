@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { attributeColor, NOT_RATED } from "@/lib/rating-color";
 import type { AttributeDetail } from "@/lib/data/prospect-detail";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -162,17 +163,21 @@ export function RatingSlider({
  * if nobody has rated it. An 8.4 from one officer and an 8.4 from nine are
  * not the same fact.
  *
- * The circle is uncolored here - the rating color function arrives with the
- * dial in build order step 7.
+ * The circle takes its color from the shared scale, lifted from the 0-10
+ * attribute scale to the 0-100 one by attributeColor().
  */
 function TeamRating({ attribute }: { attribute: AttributeDetail }) {
   const { teamRating, raterCount, raters } = attribute;
+  const color = attributeColor(teamRating);
 
   return (
     <div className="shrink-0 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-border bg-secondary">
-        <span className="tnum text-base font-bold text-foreground">
-          {teamRating === null ? "--" : teamRating.toFixed(1)}
+      <div
+        className="flex h-12 w-12 items-center justify-center rounded-full border-2 bg-secondary"
+        style={{ borderColor: color }}
+      >
+        <span className="tnum text-base font-bold" style={{ color }}>
+          {teamRating === null ? NOT_RATED : teamRating.toFixed(1)}
         </span>
       </div>
 

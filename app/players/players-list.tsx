@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { BOARD_ORDER, type PositionKey } from "@/lib/config/positions";
+import { ratingColor, formatRating } from "@/lib/rating-color";
 import { Avatar, PositionChip } from "@/components/avatar";
 import type { ProspectRow } from "@/lib/data/prospects";
 
@@ -122,22 +123,20 @@ export function PlayersList({ prospects }: { prospects: ProspectRow[] }) {
 function RatingCell({ prospect }: { prospect: ProspectRow }) {
   const { rating, inputs, covered, required } = prospect.primary;
 
-  if (rating === null) {
-    return (
-      <div className="shrink-0 text-right">
-        <div className="tnum text-xl font-bold text-rating-none">--</div>
-        <div className="text-[10px] text-muted-foreground">
-          {covered} of {required}
-        </div>
-      </div>
-    );
-  }
-
+  // The mockup's roster list uses a colored number rather than a dial;
+  // dials are for the position boards. Same color scale either way.
   return (
     <div className="shrink-0 text-right">
-      <div className="tnum text-xl font-bold text-foreground">{rating}</div>
+      <div
+        className="tnum text-xl font-bold"
+        style={{ color: ratingColor(rating) }}
+      >
+        {formatRating(rating)}
+      </div>
       <div className="tnum text-[10px] text-muted-foreground">
-        {inputs} {inputs === 1 ? "input" : "inputs"}
+        {rating === null
+          ? `${covered} of ${required}`
+          : `${inputs} ${inputs === 1 ? "input" : "inputs"}`}
       </div>
     </div>
   );

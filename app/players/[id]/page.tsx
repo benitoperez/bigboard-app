@@ -4,6 +4,7 @@ import { getOfficer } from "@/lib/auth";
 import { getProspectDetail } from "@/lib/data/prospect-detail";
 import { POSITIONS, MIN_TIMED_FOR_PERCENTILE } from "@/lib/config/positions";
 import { Avatar, PositionChip } from "@/components/avatar";
+import { Dial } from "@/components/dial";
 import { RatingSlider } from "./rating-slider";
 import { AddPosition } from "./add-position";
 
@@ -57,7 +58,7 @@ export default async function ProspectPage({
             </div>
           </div>
 
-          {/* Primary position rating. Becomes a dial in build order step 7. */}
+          {/* Primary position dial, larger than the secondaries. */}
           <PositionScore
             code={primaryRating.position}
             rating={primaryRating.rating.rating}
@@ -186,25 +187,7 @@ function PositionScore({
 }) {
   return (
     <div className="shrink-0 text-center">
-      <div
-        className={
-          "flex items-center justify-center rounded-full border-2 " +
-          (primary ? "h-20 w-20 border-primary" : "h-14 w-14 border-border-strong")
-        }
-      >
-        <span
-          className={
-            "tnum font-bold " +
-            (rating === null ? "text-rating-none " : "text-foreground ") +
-            (primary ? "text-3xl" : "text-lg")
-          }
-        >
-          {rating ?? "--"}
-        </span>
-      </div>
-      <p className="mt-1 text-[11px] font-bold tracking-wide text-primary uppercase">
-        {code}
-      </p>
+      <Dial rating={rating} size={primary ? "lg" : "md"} label={code} />
       {rating === null ? (
         <p className="tnum text-[10px] text-muted-foreground">
           {covered} of {required}
