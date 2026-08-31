@@ -231,5 +231,5 @@ left join pool   on pool.tryout_id  = p.tryout_id;
 -- before running if you agree.
 -- ============================================================
 
--- alter view prospect_attribute_ratings set (security_invoker = true);
--- alter view prospect_speed             set (security_invoker = true);
+alter view prospect_attribute_ratings set (security_invoker = true);
+alter view prospect_speed             set (security_invoker = true);

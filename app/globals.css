@@ -1,115 +1,163 @@
 @import "tailwindcss";
 
 /* ============================================================
-   BIG BOARD — DESIGN TOKENS
+   BIG BOARD - DESIGN TOKENS
 
-   Colors are sampled directly from the Figma mockup exports in
-   reference/. Values marked [FIGMA] still need confirming against
-   the source file via the Figma MCP — see reference/README.md.
+   Color, radius, and type values below are pulled verbatim from
+   the Figma Make source (Sports Tryout App Design), files
+   src/styles/theme.css and src/styles/fonts.css. Do not hand-tune
+   them - re-pull from Figma if the design moves.
 
-   Screens are style-only. Structure comes from SPEC.md.
+   The Big Board section underneath is spec-driven, not design-driven.
+
+   Screens in reference/ are style-only. Structure comes from SPEC.md.
    ============================================================ */
 
-@theme {
-  /* ---- Surfaces -------------------------------------------------
-     Sampled: #121622 is 45% of all mockup pixels (the ground),
-     #070d19 sits beneath it, #1c202c is the raised card. */
-  --color-bg:             #070d19;
-  --color-surface:        #121622;
-  --color-surface-raised: #1c202c;
-  --color-surface-high:   #232833;
-  --color-border:         #2b313e;
-  --color-border-strong:  #3a4152;
+:root {
+  --font-size: 16px;
 
-  /* ---- Text ---- */
-  --color-text:           #ffffff;
-  --color-text-secondary: #8b93a7;
-  --color-text-muted:     #4d5464;
+  /* ---- Surfaces (exact, from Figma) ---- */
+  --background: #080D1A;
+  --foreground: #E2E8F0;
+  --card: #0F1625;
+  --card-foreground: #E2E8F0;
+  --popover: #0F1625;
+  --popover-foreground: #E2E8F0;
+  --secondary: #1A2035;
+  --secondary-foreground: #E2E8F0;
+  --muted: #141927;
+  --muted-foreground: #64748B;
 
-  /* ---- Brand accent (Save CTA, active tab, focus) ---- */
-  --color-accent:         #2cc0eb;
-  --color-accent-bright:  #00b6ff;
-  --color-accent-deep:    #1884e0;
-  --color-accent-deepest: #0080ff;
+  /* ---- Brand (exact, from Figma) ---- */
+  --primary: #00D4FF;
+  --primary-foreground: #080D1A;
+  --accent: #7C3AED;
+  --accent-foreground: #E2E8F0;
+  --destructive: #EF4444;
+  --destructive-foreground: #ffffff;
+  --ring: #00D4FF;
 
-  /* ---- Rating scale — SPEC.md section 14 ------------------------
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.04);
+  --input-background: rgba(255, 255, 255, 0.04);
+  --switch-background: #1A2035;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 600;
+
+  --radius: 1rem;
+
+  /* ---- Typography (exact, from Figma fonts.css) ---- */
+  --font-sans-stack:    "Barlow", system-ui, sans-serif;
+  --font-display-stack: "Barlow Condensed", system-ui, sans-serif;
+  --font-mono-stack:    "JetBrains Mono", ui-monospace, monospace;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);   /* 12px */
+  --radius-md: calc(var(--radius) - 2px);   /* 14px */
+  --radius-lg: var(--radius);               /* 16px */
+  --radius-xl: calc(var(--radius) + 4px);   /* 20px */
+
+  /* next/font injects these three in app/layout.tsx */
+  --font-sans:    var(--font-barlow), var(--font-sans-stack);
+  --font-display: var(--font-barlow-condensed), var(--font-display-stack);
+  --font-mono:    var(--font-jetbrains-mono), var(--font-mono-stack);
+
+  /* ==========================================================
+     BIG BOARD - spec-driven, not from the mockup
+     ========================================================== */
+
+  /* ---- Rating scale - SPEC.md section 14 --------------------
      One pure function maps a number to exactly one of these.
-     Never hand-pick a rating color at a call site. */
-  --color-rating-elite: #19c37d;  /* 90+     deep green   */
-  --color-rating-high:  #2bb460;  /* 80-89   medium green */
-  --color-rating-good:  #7dd47f;  /* 75-79   pale green   */
-  --color-rating-mid:   #e8c13c;  /* 70-74   yellow       */
-  --color-rating-low:   #ec920a;  /* 60-69   orange       */
-  --color-rating-poor:  #e5484d;  /* <60     red          */
-  --color-rating-none:  #4d5464;  /* unrated neutral gray */
+     Never hand-pick a rating color at a call site.
+     The design system is Tailwind's palette; green/amber/red/slate
+     anchors below are the Figma file's own chart colors. */
+  --color-rating-elite: #16A34A;  /* 90+     deep green            */
+  --color-rating-high:  #22C55E;  /* 80-89   medium green  [figma] */
+  --color-rating-good:  #86EFAC;  /* 75-79   pale green            */
+  --color-rating-mid:   #FACC15;  /* 70-74   yellow                */
+  --color-rating-low:   #F59E0B;  /* 60-69   orange        [figma] */
+  --color-rating-poor:  #EF4444;  /* <60     red           [figma] */
+  --color-rating-none:  #64748B;  /* unrated gray          [figma] */
 
-  /* ---- Position / avatar chips ---- */
-  --color-chip-cyan:   #2cc0eb;
-  --color-chip-blue:   #1884e0;
-  --color-chip-purple: #9144ec;
-  --color-chip-pink:   #e13484;
-  --color-chip-orange: #ec920a;
-  --color-chip-green:  #2bb460;
-  --color-chip-teal:   #0fa9ab;
+  /* ---- Position / avatar chips (Figma chart palette) ---- */
+  --color-chip-cyan:   #00D4FF;
+  --color-chip-green:  #22C55E;
+  --color-chip-amber:  #F59E0B;
+  --color-chip-violet: #7C3AED;
+  --color-chip-red:    #EF4444;
 
-  /* ---- Semantic ---- */
-  --color-success: #2bb460;
-  --color-warning: #ec920a;
-  --color-danger:  #e5484d;
-
-  /* ---- Radii [FIGMA: confirm exact values] ---- */
-  --radius-chip:   9999px;
-  --radius-sm:     8px;
-  --radius-md:     12px;
-  --radius-card:   16px;
-  --radius-lg:     20px;
-  --radius-sheet:  24px;
-
-  /* ---- Tap targets — SPEC.md section 14 -------------------------
-     44px floor. Gloved hands in sunlight. Slider handles go larger. */
-  --spacing-tap:        44px;
-  --spacing-tap-large:  56px;
+  /* ---- Tap targets - SPEC.md section 14 ---------------------
+     44px floor. Gloved hands, direct sunlight. Handles go larger. */
+  --spacing-tap:           44px;
+  --spacing-tap-large:     56px;
   --spacing-slider-handle: 32px;
-
-  /* ---- Type scale [FIGMA: font family is UNCONFIRMED] -----------
-     The mockup uses a squared/techy face for numerals and a bold
-     display face for screen titles. That cannot be read out of a
-     JPG — pull the real families from Figma before shipping. */
-  --font-sans:    var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-numeric: var(--font-geist-mono), ui-monospace, monospace;
-
-  --text-display:  32px;   /* screen titles: "Leaderboard", "Athletes" */
-  --text-eyebrow:  11px;   /* "2025 SEASON", "TOP OVERALL"            */
-  --text-dial:     22px;   /* number inside a rating dial             */
-  --text-stat:     28px;   /* KPI numerals, 40 times                  */
 }
 
 /* ============================================================
    BASE
    ============================================================ */
 
-html {
-  background: var(--color-bg);
-  /* Stop iOS from inflating text in landscape. */
-  -webkit-text-size-adjust: 100%;
-}
+@layer base {
+  * {
+    border-color: var(--border);
+  }
 
-body {
-  background: var(--color-surface);
-  color: var(--color-text);
-  font-family: var(--font-sans);
-  /* Field use: no accidental text selection while tapping sliders. */
-  -webkit-tap-highlight-color: transparent;
-  overscroll-behavior-y: none;
+  html {
+    font-size: var(--font-size);
+    background: var(--background);
+    -webkit-text-size-adjust: 100%;   /* no iOS landscape inflation */
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+  }
+
+  /* Screen titles and position codes. Condensed, per the mockup. */
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    line-height: 1.15;
+  }
 }
 
 /* Respect the notch and the home indicator. */
 .safe-top    { padding-top: env(safe-area-inset-top); }
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 
-/* Tabular numerals everywhere a number is compared down a column —
+/* Tabular numerals wherever numbers are compared down a column -
    ratings, 40 times, jersey numbers. Stops digits from jittering. */
-.tnum { font-variant-numeric: tabular-nums; }
+.tnum {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
