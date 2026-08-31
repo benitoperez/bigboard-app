@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { signHeadshots } from "@/lib/data/storage";
 import {
   ATTRIBUTES,
   POSITIONS,
@@ -39,7 +40,10 @@ export type ProspectDetail = {
   fullName: string;
   primaryPosition: PositionKey;
   secondaryPositions: PositionKey[];
+  /** Signed, render-ready URL. Null when there is no headshot. */
   headshotUrl: string | null;
+  /** Underlying storage path, for replace/remove. */
+  headshotPath: string | null;
   /** Union of attributes across every position this prospect plays. */
   attributes: AttributeDetail[];
   /** Rating per position played, primary first. */
@@ -152,6 +156,8 @@ export async function getProspectDetail(
     };
   });
 
+  const signed = await signHeadshots([p.headshot_url]);
+
   const timedCount = Number(speed?.timed_count ?? 0);
   const percentileIsValid = timedCount >= MIN_TIMED_FOR_PERCENTILE;
   const speedPercentile =
@@ -177,7 +183,8 @@ export async function getProspectDetail(
     fullName: `${p.first_name} ${p.last_name}`,
     primaryPosition: p.primary_position,
     secondaryPositions,
-    headshotUrl: p.headshot_url,
+    headshotUrl: p.headshot_url ? (signed.get(p.headshot_url) ?? null) : null,
+    headshotPath: p.headshot_url ?? null,
     attributes,
     positionRatings: playedPositions.map((position) => ({
       position,

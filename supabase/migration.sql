@@ -153,6 +153,38 @@ create policy comments_delete on comments for delete to authenticated
 
 
 -- ============================================================
+-- STORAGE - headshots (SPEC.md section 13)
+--
+-- PRIVATE bucket. These are photographs of real people, and section 17 puts
+-- public and prospect-facing access out of scope, so the objects are reached
+-- through short-lived signed URLs minted at render time rather than by
+-- guessable public URLs.
+--
+-- prospects.headshot_url stores the storage PATH, not a URL: a signed URL
+-- expires, and storing one would leave dead links in the database inside an
+-- hour.
+--
+-- All four policies are needed, not three. Replacing a headshot is an upsert,
+-- and a Storage upsert requires INSERT + SELECT + UPDATE together - grant only
+-- INSERT and new uploads work while replacements silently fail.
+-- ============================================================
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('headshots', 'headshots', false, 2097152,
+        array['image/jpeg','image/png','image/webp'])
+on conflict (id) do nothing;
+
+create policy headshots_read on storage.objects for select to authenticated
+  using (bucket_id = 'headshots');
+create policy headshots_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'headshots');
+create policy headshots_update on storage.objects for update to authenticated
+  using (bucket_id = 'headshots') with check (bucket_id = 'headshots');
+create policy headshots_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'headshots');
+
+
+-- ============================================================
 -- SECTION 7 - VIEWS
 --
 -- These handle the cross-prospect math that SQL is genuinely

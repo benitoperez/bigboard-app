@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { signHeadshots } from "@/lib/data/storage";
 import {
   POSITIONS,
   MIN_TIMED_FOR_PERCENTILE,
@@ -25,7 +26,10 @@ export type ProspectRow = {
   fullName: string;
   primaryPosition: PositionKey;
   secondaryPositions: PositionKey[];
+  /** Signed, render-ready URL. Null when there is no headshot. */
   headshotUrl: string | null;
+  /** Underlying storage path, for replace/remove. */
+  headshotPath: string | null;
   /** Rating at the prospect's PRIMARY position - what the directory shows. */
   primary: PositionRating;
   /**
@@ -94,6 +98,9 @@ export async function getProspects(tryoutId: string): Promise<ProspectRow[]> {
 
   if (!prospects) return [];
 
+  // Private bucket: paths become signed URLs in one batch, not per row.
+  const signed = await signHeadshots(prospects.map((p) => p.headshot_url));
+
   // Group attribute ratings by prospect.
   const byProspect = new Map<string, AttributeRatings>();
   for (const r of attrRows ?? []) {
@@ -154,7 +161,9 @@ export async function getProspects(tryoutId: string): Promise<ProspectRow[]> {
         fullName: `${p.first_name} ${p.last_name}`,
         primaryPosition: p.primary_position,
         secondaryPositions,
-        headshotUrl: p.headshot_url,
+        headshotUrl: p.headshot_url ? (signed.get(p.headshot_url) ?? null) : null,
+        /** Raw storage path, for replace/remove. */
+        headshotPath: p.headshot_url ?? null,
         primary: ratingsByPosition[p.primary_position]!,
         ratingsByPosition,
         playedPositions,

@@ -13,6 +13,7 @@ import { AddPosition } from "./add-position";
 import { FortyEntry } from "./forty-entry";
 import { SelectToggle } from "@/components/select-toggle";
 import { Comments } from "./comments";
+import { HeadshotUpload } from "./headshot-upload";
 
 export default async function ProspectPage({
   params,
@@ -113,6 +114,16 @@ export default async function ProspectPage({
             taken={[p.primaryPosition, ...p.secondaryPositions]}
           />
         </div>
+
+        {/* SPEC.md section 13: optional, and nothing blocks on it. */}
+        {tryout && (
+          <HeadshotUpload
+            prospectId={p.id}
+            tryoutId={tryout.id}
+            hasHeadshot={p.headshotPath !== null}
+            currentPath={p.headshotPath}
+          />
+        )}
 
         {/* Speed strip. Styled apart from the dials on purpose: this is a
             measurement, not an opinion, and the design should say so. It
