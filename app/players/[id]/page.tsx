@@ -4,6 +4,7 @@ import { getOfficer } from "@/lib/auth";
 import { getProspectDetail } from "@/lib/data/prospect-detail";
 import { getActiveTryout } from "@/lib/data/prospects";
 import { getSelectedIds } from "@/lib/data/selections";
+import { getComments } from "@/lib/data/comments";
 import { POSITIONS, MIN_TIMED_FOR_PERCENTILE } from "@/lib/config/positions";
 import { Avatar, PositionChip } from "@/components/avatar";
 import { Dial } from "@/components/dial";
@@ -11,6 +12,7 @@ import { RatingSlider } from "./rating-slider";
 import { AddPosition } from "./add-position";
 import { FortyEntry } from "./forty-entry";
 import { SelectToggle } from "@/components/select-toggle";
+import { Comments } from "./comments";
 
 export default async function ProspectPage({
   params,
@@ -24,7 +26,10 @@ export default async function ProspectPage({
   const p = await getProspectDetail(id, officer.id);
   if (!p) notFound();
 
-  const tryout = await getActiveTryout();
+  const [tryout, comments] = await Promise.all([
+    getActiveTryout(),
+    getComments(id),
+  ]);
   const selectedIds = tryout ? await getSelectedIds(tryout.id) : new Set<string>();
 
   const [primaryRating, ...secondaryRatings] = p.positionRatings;
@@ -171,9 +176,14 @@ export default async function ProspectPage({
         timedCount={p.timedCount}
       />
 
-      <p className="mt-6 pb-4 text-xs text-muted-foreground">
-        Comments land in step 11.
-      </p>
+      {/* ---- Comments (SPEC.md section 10.3) ---- */}
+      <div className="pb-4">
+        <Comments
+          prospectId={p.id}
+          comments={comments}
+          officerId={officer.id}
+        />
+      </div>
     </main>
   );
 }
