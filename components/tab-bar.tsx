@@ -3,16 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-/**
- * Bottom tab bar - SPEC.md section 10.
- *
- * The spec calls for four tabs: Home, Players, Selected, Account. Selected
- * lands with build order step 9; listing a tab that 404s is worse than
- * adding it when the screen exists, so it is absent until then.
- */
+/** Bottom tab bar - SPEC.md section 10. Four tabs. */
 const TABS = [
   { href: "/", label: "Home", icon: HomeIcon },
   { href: "/players", label: "Players", icon: PlayersIcon },
+  { href: "/selected", label: "Selected", icon: SelectedIcon },
   { href: "/account", label: "Account", icon: AccountIcon },
 ] as const;
 
@@ -83,6 +78,15 @@ function PlayersIcon() {
       <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
       <circle cx="9" cy="7" r="4" />
       <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+    </svg>
+  );
+}
+
+function SelectedIcon() {
+  return (
+    <svg {...iconProps}>
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      <path d="m8.5 12 2.5 2.5 4.5-5" />
     </svg>
   );
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BOARD_ORDER, type PositionKey } from "@/lib/config/positions";
 import { ratingColor, formatRating } from "@/lib/rating-color";
 import { Avatar, PositionChip } from "@/components/avatar";
+import { SelectToggle } from "@/components/select-toggle";
 import type { ProspectRow } from "@/lib/data/prospects";
 
 /** SPEC.md section 10.2: search matches on jersey number OR name, both. */
@@ -15,7 +16,14 @@ function matches(p: ProspectRow, q: string) {
   return p.fullName.toLowerCase().includes(needle);
 }
 
-export function PlayersList({ prospects }: { prospects: ProspectRow[] }) {
+export function PlayersList({
+  prospects,
+  selectedIds,
+}: {
+  prospects: ProspectRow[];
+  selectedIds: string[];
+}) {
+  const selected = new Set(selectedIds);
   const [query, setQuery] = useState("");
   const [position, setPosition] = useState<PositionKey | null>(null);
 
@@ -101,6 +109,14 @@ export function PlayersList({ prospects }: { prospects: ProspectRow[] }) {
               </div>
 
               <RatingCell prospect={p} />
+
+              {/* SPEC.md section 10.4: the add control appears on each
+                  directory row as well as in the profile header. */}
+              <SelectToggle
+                prospectId={p.id}
+                prospectName={p.fullName}
+                initialSelected={selected.has(p.id)}
+              />
             </Link>
           </li>
         ))}

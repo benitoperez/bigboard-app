@@ -2,12 +2,15 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getOfficer } from "@/lib/auth";
 import { getProspectDetail } from "@/lib/data/prospect-detail";
+import { getActiveTryout } from "@/lib/data/prospects";
+import { getSelectedIds } from "@/lib/data/selections";
 import { POSITIONS, MIN_TIMED_FOR_PERCENTILE } from "@/lib/config/positions";
 import { Avatar, PositionChip } from "@/components/avatar";
 import { Dial } from "@/components/dial";
 import { RatingSlider } from "./rating-slider";
 import { AddPosition } from "./add-position";
 import { FortyEntry } from "./forty-entry";
+import { SelectToggle } from "@/components/select-toggle";
 
 export default async function ProspectPage({
   params,
@@ -20,6 +23,9 @@ export default async function ProspectPage({
 
   const p = await getProspectDetail(id, officer.id);
   if (!p) notFound();
+
+  const tryout = await getActiveTryout();
+  const selectedIds = tryout ? await getSelectedIds(tryout.id) : new Set<string>();
 
   const [primaryRating, ...secondaryRatings] = p.positionRatings;
 
@@ -56,6 +62,19 @@ export default async function ProspectPage({
               {p.secondaryPositions.map((s) => (
                 <PositionChip key={s} position={s} muted />
               ))}
+            </div>
+
+            {/* SPEC.md section 10.4: the add control also lives here. */}
+            <div className="mt-3 flex items-center gap-2">
+              <SelectToggle
+                prospectId={p.id}
+                prospectName={p.fullName}
+                initialSelected={selectedIds.has(p.id)}
+                size="lg"
+              />
+              <span className="text-xs text-muted-foreground">
+                {selectedIds.has(p.id) ? "On the team list" : "Add to team list"}
+              </span>
             </div>
           </div>
 
@@ -153,7 +172,7 @@ export default async function ProspectPage({
       />
 
       <p className="mt-6 pb-4 text-xs text-muted-foreground">
-        The select control lands in step 9, comments in step 11.
+        Comments land in step 11.
       </p>
     </main>
   );

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getActiveTryout, getProspects } from "@/lib/data/prospects";
+import { getSelectedIds } from "@/lib/data/selections";
 import { PlayersList } from "./players-list";
 
 export const metadata: Metadata = { title: "Players - Big Board" };
@@ -19,7 +20,10 @@ export default async function PlayersPage() {
     );
   }
 
-  const prospects = await getProspects(tryout.id);
+  const [prospects, selectedIds] = await Promise.all([
+    getProspects(tryout.id),
+    getSelectedIds(tryout.id),
+  ]);
 
   return (
     <main className="safe-top safe-bottom px-6 py-8">
@@ -35,7 +39,7 @@ export default async function PlayersPage() {
           No prospects yet. Import a roster from the Account screen.
         </p>
       ) : (
-        <PlayersList prospects={prospects} />
+        <PlayersList prospects={prospects} selectedIds={[...selectedIds]} />
       )}
     </main>
   );
