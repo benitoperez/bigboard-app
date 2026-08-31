@@ -11,7 +11,8 @@
     "seed:dev": "tsx scripts/seed-dev.ts",
     "verify:roster": "tsx scripts/verify-roster.ts",
     "verify:color": "tsx scripts/verify-color.ts",
-    "verify": "npm run verify:rating && npm run verify:roster && npm run verify:color"
+    "verify": "npm run verify:rating && npm run verify:roster && npm run verify:color && npm run verify:imports",
+    "verify:imports": "tsx scripts/verify-imports.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",

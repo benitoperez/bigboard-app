@@ -1,16 +1,20 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getOfficer } from "@/lib/auth";
-import { getActiveTryout } from "@/lib/data/prospects";
+import { getActiveTryout, getTryoutsWithCounts } from "@/lib/data/tryouts";
 import { signOut } from "@/app/login/actions";
 import { CsvImport } from "./csv-import";
 import { DeleteAllProspects } from "./delete-all";
+import { TryoutManager } from "./tryout-manager";
 
 export const metadata: Metadata = { title: "Account - Big Board" };
 
 export default async function AccountPage() {
   const { officer } = await getOfficer();
-  const tryout = await getActiveTryout();
+  const [tryout, tryouts] = await Promise.all([
+    getActiveTryout(),
+    getTryoutsWithCounts(),
+  ]);
 
   const supabase = await createClient();
   const {
@@ -49,19 +53,7 @@ export default async function AccountPage() {
         )}
       </section>
 
-      <section className="mt-4 rounded-lg border border-border bg-card p-4">
-        <p className="text-xs font-semibold tracking-[0.15em] text-muted-foreground uppercase">
-          Active Tryout
-        </p>
-        <p className="mt-1 text-base text-foreground">
-          {tryout ? tryout.name : "None"}
-        </p>
-        {tryout && (
-          <p className="tnum mt-1 text-sm text-muted-foreground">
-            {tryout.tryout_date} &middot; {takenJerseys.length} prospects
-          </p>
-        )}
-      </section>
+      <TryoutManager tryouts={tryouts} isAdmin={officer?.is_admin ?? false} />
 
       {/* SPEC.md section 12: admin only. The server action re-checks this. */}
       {officer?.is_admin && (

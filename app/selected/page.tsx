@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getActiveTryout, getProspects } from "@/lib/data/prospects";
+import { getProspects } from "@/lib/data/prospects";
+import { getActiveTryout } from "@/lib/data/tryouts";
+import { tryoutPeriod } from "@/lib/tryouts";
 import { getSelections } from "@/lib/data/selections";
 import { BOARD_ORDER, POSITIONS, type PositionKey } from "@/lib/config/positions";
 import { ratingColor, formatRating } from "@/lib/rating-color";
@@ -39,6 +41,9 @@ export default async function SelectedPage() {
       <header>
         <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
           {tryout.name}
+          {tryoutPeriod(tryout) && (
+            <span className="text-muted-foreground"> &middot; {tryoutPeriod(tryout)}</span>
+          )}
         </p>
         <h1 className="mt-1 text-4xl tracking-tight uppercase">Selected</h1>
       </header>

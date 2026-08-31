@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getOfficer } from "@/lib/auth";
 import { getProspectDetail } from "@/lib/data/prospect-detail";
-import { getActiveTryout } from "@/lib/data/prospects";
+import { getActiveTryout } from "@/lib/data/tryouts";
 import { getSelectedIds } from "@/lib/data/selections";
 import { getComments } from "@/lib/data/comments";
 import { POSITIONS, MIN_TIMED_FOR_PERCENTILE } from "@/lib/config/positions";

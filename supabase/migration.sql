@@ -10,10 +10,18 @@
 -- SECTION 5 - SCHEMA
 -- ============================================================
 
+-- A tryout class is one cycle - "Fall 2026". Every prospect, rating, 40
+-- time, selection and comment hangs off one by tryout_id, so past classes
+-- stay intact forever and switching which is active swaps the whole app onto
+-- that season's data. Exactly one is active at a time.
 create table tryouts (
   id           uuid primary key default gen_random_uuid(),
   name         text not null,
-  tryout_date  date not null,
+  season_year  int,
+  semester     text check (semester is null or semester in ('fall','spring','na')),
+  -- Optional: a class is identified by name + year + semester. A specific
+  -- calendar date is extra detail, not a requirement.
+  tryout_date  date,
   is_active    boolean not null default true,
   created_at   timestamptz not null default now()
 );
@@ -113,6 +121,22 @@ create policy read_all on ratings       for select to authenticated using (true)
 create policy read_all on drill_results for select to authenticated using (true);
 create policy read_all on selections    for select to authenticated using (true);
 create policy read_all on comments      for select to authenticated using (true);
+
+-- Tryout classes: creating one, and switching which is live, are ADMIN
+-- actions - they move every officer's screens onto a different season.
+-- There is deliberately NO delete policy: a class is the historical record,
+-- and deleting one would cascade away an entire year of evaluations.
+create policy create_tryouts on tryouts for insert to authenticated
+  with check (exists (
+    select 1 from officers o where o.id = (select auth.uid()) and o.is_admin
+  ));
+create policy update_tryouts on tryouts for update to authenticated
+  using (exists (
+    select 1 from officers o where o.id = (select auth.uid()) and o.is_admin
+  ))
+  with check (exists (
+    select 1 from officers o where o.id = (select auth.uid()) and o.is_admin
+  ));
 
 -- Prospects: any officer can add or edit (roster management is collaborative).
 create policy write_prospects on prospects for insert to authenticated with check (true);

@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
-import { getActiveTryout, getProspects } from "@/lib/data/prospects";
+import { getProspects } from "@/lib/data/prospects";
+import { getActiveTryout } from "@/lib/data/tryouts";
+import { tryoutPeriod } from "@/lib/tryouts";
 import { getSelectedIds } from "@/lib/data/selections";
 import { PlayersList } from "./players-list";
+import { AddAthlete } from "./add-athlete";
 
 export const metadata: Metadata = { title: "Players - Big Board" };
 
@@ -27,16 +30,21 @@ export default async function PlayersPage() {
 
   return (
     <main className="safe-top safe-bottom px-6 py-8">
-      <header>
-        <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
-          {tryout.name}
-        </p>
-        <h1 className="mt-1 text-4xl tracking-tight uppercase">Players</h1>
+      <header className="flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
+            {tryout.name}
+            {tryoutPeriod(tryout) && <> &middot; {tryoutPeriod(tryout)}</>}
+          </p>
+          <h1 className="mt-1 text-4xl tracking-tight uppercase">Players</h1>
+        </div>
+        <AddAthlete tryoutName={tryout.name} />
       </header>
 
       {prospects.length === 0 ? (
         <p className="mt-8 text-sm text-muted-foreground">
-          No prospects yet. Import a roster from the Account screen.
+          No athletes in this class yet. Use <strong>+ Add</strong> above for
+          one at a time, or import a roster CSV from the Account screen.
         </p>
       ) : (
         <PlayersList prospects={prospects} selectedIds={[...selectedIds]} />

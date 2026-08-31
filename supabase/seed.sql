@@ -24,8 +24,8 @@
 -- SPEC.md section 10.5 has an active tryout selector on the Account
 -- screen. is_active drives which tryout the app loads by default.
 
-insert into tryouts (name, tryout_date, is_active)
-values ('2026 Fall Tryouts', '2026-09-13', true);
+insert into tryouts (name, season_year, semester, is_active)
+values ('Fall Tryouts', 2026, 'fall', true);
 
 
 -- ---- One officer ----------------------------------------------

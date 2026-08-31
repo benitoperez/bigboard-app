@@ -12,12 +12,6 @@ import {
   type PositionRating,
 } from "@/lib/ratings";
 
-export type Tryout = {
-  id: string;
-  name: string;
-  tryout_date: string;
-};
-
 export type ProspectRow = {
   id: string;
   jerseyNumber: number;
@@ -50,18 +44,6 @@ export type ProspectRow = {
 
 function isPositionKey(v: unknown): v is PositionKey {
   return typeof v === "string" && v in POSITIONS;
-}
-
-export async function getActiveTryout(): Promise<Tryout | null> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("tryouts")
-    .select("id, name, tryout_date")
-    .eq("is_active", true)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  return data ?? null;
 }
 
 /**
