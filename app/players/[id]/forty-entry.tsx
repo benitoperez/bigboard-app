@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { MAX_FORTY_ATTEMPTS, MIN_TIMED_FOR_PERCENTILE } from "@/lib/config/positions";
-import { saveFortyAttempt } from "./forty-actions";
+import { saveFortyAttempt, deleteFortyAttempt } from "./forty-actions";
 
 type Attempt = { attemptNumber: number; value: number };
 
@@ -37,7 +37,7 @@ export function FortyEntry({
         40 Yard Dash
       </h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        Any officer can record or correct either attempt. The best time feeds
+        Any officer can record, correct, or clear either attempt. The best time feeds
         the rating.
       </p>
 
@@ -128,15 +128,27 @@ function AttemptField({
 
   function commit() {
     const trimmed = value.trim();
-    // Unchanged, or cleared without ever having a value: nothing to write.
     if (trimmed === committedRef.current) return;
+
+    setError(null);
+
+    // Emptying a field that held a time clears the attempt. Emptying one that
+    // was already empty is a no-op, not a delete of nothing.
     if (trimmed === "") {
-      // Clearing is not supported - see the note in the page. Restore.
-      setValue(committedRef.current);
+      if (committedRef.current === "") return;
+      startTransition(async () => {
+        const res = await deleteFortyAttempt(prospectId, attemptNumber);
+        if (!res.ok) {
+          setError(res.error);
+          setValue(committedRef.current); // put the time back
+          return;
+        }
+        committedRef.current = "";
+        router.refresh();
+      });
       return;
     }
 
-    setError(null);
     startTransition(async () => {
       const res = await saveFortyAttempt(prospectId, attemptNumber, trimmed);
       if (!res.ok) {

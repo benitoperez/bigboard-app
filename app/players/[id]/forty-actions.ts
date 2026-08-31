@@ -66,3 +66,36 @@ export async function saveFortyAttempt(
   revalidatePath("/");
   return { ok: true };
 }
+
+/**
+ * Clear a recorded attempt outright.
+ *
+ * Permitted by the drills_delete policy, which is `using (true)` for the same
+ * reason insert and update are open: a wrong time left in the system is worse
+ * than a small trust risk. Note this differs from ratings, where delete is
+ * restricted to the officer's own rows - a rating is one person's opinion and
+ * therefore his alone to withdraw, while a 40 time is a measurement anyone
+ * present can see is wrong.
+ */
+export async function deleteFortyAttempt(
+  prospectId: string,
+  attemptNumber: number,
+): Promise<FortyResult> {
+  const { officer } = await getOfficer();
+  if (!officer) return { ok: false, error: "Not signed in." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("drill_results")
+    .delete()
+    .eq("prospect_id", prospectId)
+    .eq("drill_key", "forty")
+    .eq("attempt_number", attemptNumber);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/players/${prospectId}`);
+  revalidatePath("/players");
+  revalidatePath("/");
+  return { ok: true };
+}

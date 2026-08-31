@@ -131,6 +131,13 @@ create policy drills_insert on drill_results for insert to authenticated
   with check (recorded_by = auth.uid());
 create policy drills_update on drill_results for update to authenticated
   using (true) with check (recorded_by = auth.uid());
+-- Anyone can clear a bogus attempt, matching the insert/update reasoning
+-- above: a wrong time left in the system is worse than a small trust risk
+-- among fifteen people who know each other. Unlike ratings, which are one
+-- officer's opinion and therefore his alone to delete, a 40 time is a
+-- measurement that anyone present can see is wrong.
+create policy drills_delete on drill_results for delete to authenticated
+  using (true);
 
 -- Selections: anyone can add or remove.
 create policy selections_insert on selections for insert to authenticated
