@@ -105,7 +105,7 @@ export default async function SelectedPage() {
                             #{p.jerseyNumber}
                           </span>
                         </div>
-                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        <p className="mt-0.5 text-xs text-muted-foreground">
                           added by{" "}
                           {selections.find((s) => s.prospectId === p.id)
                             ?.selectedByName ?? "an officer"}

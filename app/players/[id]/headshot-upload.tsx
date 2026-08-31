@@ -134,10 +134,10 @@ export function HeadshotUpload({
       </div>
 
       {status && (
-        <p className="mt-1 text-[11px] text-muted-foreground">{status}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{status}</p>
       )}
       {error && (
-        <p role="alert" className="mt-1 text-[11px] text-destructive">
+        <p role="alert" className="mt-1 text-xs text-destructive">
           {error}
         </p>
       )}

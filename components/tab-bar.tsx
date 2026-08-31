@@ -37,7 +37,7 @@ export function TabBar() {
                 }
               >
                 <Icon />
-                <span className="text-[11px] font-semibold tracking-wide">
+                <span className="text-xs font-semibold tracking-wide">
                   {label}
                 </span>
               </Link>

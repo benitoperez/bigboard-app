@@ -14,6 +14,7 @@ import { FortyEntry } from "./forty-entry";
 import { SelectToggle } from "@/components/select-toggle";
 import { Comments } from "./comments";
 import { HeadshotUpload } from "./headshot-upload";
+import { DeleteProspect } from "./delete-prospect";
 
 export default async function ProspectPage({
   params,
@@ -54,7 +55,7 @@ export default async function ProspectPage({
               name={p.fullName}
               size="lg"
             />
-            <span className="tnum absolute -top-1 -left-1 rounded bg-background px-1.5 text-[11px] font-bold text-foreground">
+            <span className="tnum absolute -top-1 -left-1 rounded bg-background px-1.5 text-xs font-bold text-foreground">
               #{p.jerseyNumber}
             </span>
           </div>
@@ -130,7 +131,7 @@ export default async function ProspectPage({
             carries only the headline fact - the 40 section below owns both
             attempts and the editing. */}
         <div className="mt-4 flex items-baseline gap-2 rounded-md border border-border-strong bg-secondary px-3 py-2">
-          <p className="text-[10px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
+          <p className="text-[11px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
             40
           </p>
           {p.bestForty === null ? (
@@ -188,13 +189,24 @@ export default async function ProspectPage({
       />
 
       {/* ---- Comments (SPEC.md section 10.3) ---- */}
-      <div className="pb-4">
+      <div>
         <Comments
           prospectId={p.id}
           comments={comments}
           officerId={officer.id}
         />
       </div>
+
+      {/* Destructive, admin only, and last on the page on purpose. */}
+      {officer.is_admin && (
+        <div className="pb-4">
+          <DeleteProspect
+            prospectId={p.id}
+            prospectName={p.fullName}
+            jerseyNumber={p.jerseyNumber}
+          />
+        </div>
+      )}
     </main>
   );
 }
@@ -231,16 +243,16 @@ function PositionScore({
     <div className="shrink-0 text-center">
       <Dial rating={rating} size={primary ? "lg" : "md"} label={code} />
       {rating === null ? (
-        <p className="tnum text-[10px] text-muted-foreground">
+        <p className="tnum text-[11px] text-muted-foreground">
           {covered} of {required}
         </p>
       ) : (
-        <p className="tnum text-[10px] text-muted-foreground">
+        <p className="tnum text-[11px] text-muted-foreground">
           {inputs} {inputs === 1 ? "input" : "inputs"}
         </p>
       )}
       {rating === null && missing.length > 0 && primary && (
-        <p className="mx-auto mt-1 max-w-[10rem] text-[10px] leading-tight text-muted-foreground">
+        <p className="mx-auto mt-1 max-w-[10rem] text-[11px] leading-tight text-muted-foreground">
           missing {missing.join(", ")}
         </p>
       )}

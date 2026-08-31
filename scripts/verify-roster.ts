@@ -159,6 +159,71 @@ console.log("=".repeat(70));
   check("all four problems on one row reported", !r.ok && r.errors.length, 4);
 }
 
+// ---- optional 40 times -------------------------------------------------
+console.log("\n--- optional 40 time columns ---");
+
+const rowT = (
+  jersey: string,
+  f1: string,
+  f2: string,
+  h1 = "forty_1",
+  h2 = "forty_2",
+): Record<string, unknown> => ({
+  first_name: "A",
+  last_name: "B",
+  jersey_number: jersey,
+  primary_position: "QB",
+  [h1]: f1,
+  [h2]: f2,
+});
+const HEADERS_T = [...HEADERS, "forty_1", "forty_2"];
+
+{
+  const r = validateRoster([rowT("7", "4.61", "4.72")], HEADERS_T, new Set());
+  check("both times parsed", r.ok && r.rows[0].forty_1, 4.61);
+  check("second time parsed", r.ok && r.rows[0].forty_2, 4.72);
+}
+{
+  const r = validateRoster([rowT("7", "4.61", "")], HEADERS_T, new Set());
+  check("blank second time is null, not an error", r.ok, true);
+  check("blank means not timed", r.ok && r.rows[0].forty_2, null);
+}
+{
+  // The columns are optional: a file without them still imports.
+  const r = validateRoster([row("A", "B", "7", "QB")], HEADERS, new Set());
+  check("file with no 40 columns still valid", r.ok, true);
+  check("missing columns give null times", r.ok && r.rows[0].forty_1, null);
+}
+{
+  const r = validateRoster([rowT("7", "abc", "")], HEADERS_T, new Set());
+  check("unparseable time rejected, not silently dropped", r.ok, false);
+}
+{
+  const r = validateRoster([rowT("7", "25.0", "")], HEADERS_T, new Set());
+  check("out-of-range time rejected (>= 20s)", r.ok, false);
+}
+{
+  const r = validateRoster([rowT("7", "0", "")], HEADERS_T, new Set());
+  check("zero rejected (CHECK requires > 0)", r.ok, false);
+}
+{
+  // Real Excel headers are whatever the person typed.
+  const r = validateRoster(
+    [rowT("7", "4.61", "4.70", "40_1", "40_2")],
+    [...HEADERS, "40_1", "40_2"],
+    new Set(),
+  );
+  check("alias headers 40_1 / 40_2 accepted", r.ok && r.rows[0].forty_1, 4.61);
+}
+{
+  const r = validateRoster(
+    [rowT("7", "4.61", "4.70", "Forty_1", "FORTY_2")],
+    [...HEADERS, "Forty_1", "FORTY_2"],
+    new Set(),
+  );
+  check("40 header case tolerated", r.ok && r.rows[0].forty_2, 4.7);
+}
+
 console.log("\n" + "=".repeat(70));
 console.log(failures === 0 ? "ALL CHECKS PASS" : `${failures} FAILURE(S)`);
 console.log("=".repeat(70));

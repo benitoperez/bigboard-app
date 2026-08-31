@@ -65,7 +65,7 @@ export function PositionChip({
     <span
       title={POSITIONS[position].label}
       className={
-        "rounded-full px-2 py-0.5 text-[11px] font-bold tracking-wide uppercase " +
+        "rounded-full px-2 py-0.5 text-xs font-bold tracking-wide uppercase " +
         (muted
           ? "bg-secondary text-muted-foreground"
           : "bg-primary/15 text-primary")

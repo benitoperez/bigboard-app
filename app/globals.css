@@ -26,7 +26,7 @@
   --secondary: #1A2035;
   --secondary-foreground: #E2E8F0;
   --muted: #141927;
-  --muted-foreground: #64748B;
+  --muted-foreground: #94A3B8;
 
   /* ---- Brand (exact, from Figma) ---- */
   --primary: #00D4FF;
@@ -101,7 +101,7 @@
   --color-rating-mid:   #FACC15;  /* 70-74   yellow                */
   --color-rating-low:   #F59E0B;  /* 60-69   orange        [figma] */
   --color-rating-poor:  #EF4444;  /* <60     red           [figma] */
-  --color-rating-none:  #64748B;  /* unrated gray          [figma] */
+  --color-rating-none:  #94A3B8;  /* unrated gray          [figma] */
 
   /* ---- Semantic status. Figma defines destructive only; success and
      warning reuse its chart green and amber so the palette stays closed. */

@@ -90,7 +90,7 @@ export function Comments({
                     <span className="flex items-baseline gap-2">
                       <time
                         dateTime={c.createdAt}
-                        className="tnum text-[10px] text-muted-foreground"
+                        className="tnum text-[11px] text-muted-foreground"
                       >
                         {formatWhen(c.createdAt)}
                       </time>
@@ -100,7 +100,7 @@ export function Comments({
                           onClick={() => remove(c.id)}
                           disabled={pending}
                           aria-label="Delete your comment"
-                          className="text-[10px] text-muted-foreground underline disabled:opacity-50"
+                          className="text-[11px] text-muted-foreground underline disabled:opacity-50"
                         >
                           delete
                         </button>
@@ -139,7 +139,7 @@ export function Comments({
                          disabled:opacity-50"
             />
             {remaining < 100 && (
-              <p className="tnum mt-1 text-[10px] text-muted-foreground">
+              <p className="tnum mt-1 text-[11px] text-muted-foreground">
                 {remaining} left
               </p>
             )}

@@ -27,7 +27,7 @@ import {
 } from "../lib/config/positions";
 
 // Deterministic PRNG so reruns produce identical data.
-let seed = 20250913;
+let seed = 20260913;
 function rand() {
   seed = (seed * 1664525 + 1013904223) % 4294967296;
   return seed / 4294967296;

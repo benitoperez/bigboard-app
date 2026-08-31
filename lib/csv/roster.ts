@@ -20,11 +20,26 @@ export const REQUIRED_COLUMNS = [
   "primary_position",
 ] as const;
 
+/**
+ * Optional 40 yard dash columns. Real tryout spreadsheets already carry
+ * these, so importing them saves re-entering a hundred times by hand.
+ *
+ * Several spellings are accepted because the header in a real Excel export is
+ * whatever the person who made it typed.
+ */
+export const FORTY_COLUMNS = {
+  1: ["forty_1", "forty1", "40_1", "401", "forty_time_1", "40 time 1", "forty 1"],
+  2: ["forty_2", "forty2", "40_2", "402", "forty_time_2", "40 time 2", "forty 2"],
+} as const;
+
 export type RosterRow = {
   first_name: string;
   last_name: string;
   jersey_number: number;
   primary_position: PositionKey;
+  /** Null when the column is absent or the cell is blank. */
+  forty_1: number | null;
+  forty_2: number | null;
 };
 
 export type RowError = {
@@ -38,6 +53,23 @@ export type ValidationResult =
   | { ok: false; errors: RowError[]; skippedBlank: number };
 
 const VALID_POSITIONS = Object.keys(POSITIONS) as PositionKey[];
+
+/**
+ * Reads a 40 time under any of its accepted header spellings.
+ * Returns undefined when no such column exists at all.
+ */
+function readForty(
+  rec: Record<string, unknown>,
+  attempt: 1 | 2,
+): string | undefined {
+  for (const key of Object.keys(rec)) {
+    const norm = key.trim().toLowerCase();
+    if ((FORTY_COLUMNS[attempt] as readonly string[]).includes(norm)) {
+      return String(rec[key] ?? "").trim();
+    }
+  }
+  return undefined;
+}
 
 function isBlankRecord(rec: Record<string, unknown>) {
   return Object.values(rec).every(
@@ -140,12 +172,41 @@ export function validateRoster(
       });
     }
 
+    // --- optional 40 times ---
+    // A blank cell means "not timed", which is not an error. A cell with
+    // something unparseable in it IS an error - silently dropping a time the
+    // user believes they imported is worse than refusing the file.
+    const forty: Record<1 | 2, number | null> = { 1: null, 2: null };
+    for (const attempt of [1, 2] as const) {
+      const raw = readForty(rec, attempt);
+      if (raw === undefined || raw === "") continue;
+      if (!/^\d{1,2}(\.\d{1,2})?$/.test(raw)) {
+        errors.push({
+          line,
+          message: `40 time "${raw}" (attempt ${attempt}) is not a time like 4.61.`,
+        });
+        continue;
+      }
+      const v = Number(raw);
+      // Mirrors the CHECK constraint: value > 0 and value < 20.
+      if (!(v > 0 && v < 20)) {
+        errors.push({
+          line,
+          message: `40 time ${v} (attempt ${attempt}) must be between 0 and 20 seconds.`,
+        });
+        continue;
+      }
+      forty[attempt] = v;
+    }
+
     if (first && last && jersey !== null && VALID_POSITIONS.includes(pos)) {
       rows.push({
         first_name: first,
         last_name: last,
         jersey_number: jersey,
         primary_position: pos,
+        forty_1: forty[1],
+        forty_2: forty[2],
       });
     }
   });

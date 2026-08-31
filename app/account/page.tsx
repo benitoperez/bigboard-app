@@ -4,6 +4,7 @@ import { getOfficer } from "@/lib/auth";
 import { getActiveTryout } from "@/lib/data/prospects";
 import { signOut } from "@/app/login/actions";
 import { CsvImport } from "./csv-import";
+import { DeleteAllProspects } from "./delete-all";
 
 export const metadata: Metadata = { title: "Account - Big Board" };
 
@@ -64,9 +65,12 @@ export default async function AccountPage() {
 
       {/* SPEC.md section 12: admin only. The server action re-checks this. */}
       {officer?.is_admin && (
-        <div className="mt-4">
-          <CsvImport takenJerseys={takenJerseys} />
-        </div>
+        <>
+          <div className="mt-4">
+            <CsvImport takenJerseys={takenJerseys} />
+          </div>
+          <DeleteAllProspects prospectCount={takenJerseys.length} />
+        </>
       )}
 
       <form action={signOut} className="mt-8">

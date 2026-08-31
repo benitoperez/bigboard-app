@@ -10,7 +10,7 @@ type Phase =
   | { kind: "parsing" }
   | { kind: "errors"; errors: RowError[]; fileName: string }
   | { kind: "ready"; records: Record<string, unknown>[]; headers: string[]; count: number; skippedBlank: number; fileName: string }
-  | { kind: "done"; inserted: number; skippedBlank: number };
+  | { kind: "done"; inserted: number; importedTimes: number; skippedBlank: number };
 
 export function CsvImport({ takenJerseys }: { takenJerseys: number[] }) {
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
@@ -65,7 +65,12 @@ export function CsvImport({ takenJerseys }: { takenJerseys: number[] }) {
     startTransition(async () => {
       const res: ImportResult = await importRoster(records, headers);
       if (res.ok) {
-        setPhase({ kind: "done", inserted: res.inserted, skippedBlank: res.skippedBlank });
+        setPhase({
+          kind: "done",
+          inserted: res.inserted,
+          importedTimes: res.importedTimes,
+          skippedBlank: res.skippedBlank,
+        });
         if (fileInput.current) fileInput.current.value = "";
       } else {
         setPhase({ kind: "errors", errors: res.errors, fileName: "" });
@@ -77,9 +82,16 @@ export function CsvImport({ takenJerseys }: { takenJerseys: number[] }) {
     <section className="rounded-lg border border-border bg-card p-4">
       <h2 className="text-xl uppercase">Import Roster</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        CSV with columns{" "}
+        Required columns:{" "}
         <code className="text-foreground">{REQUIRED_COLUMNS.join(", ")}</code>.
-        The whole file is checked before anything is saved.
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Optional: <code className="text-foreground">forty_1</code> and{" "}
+        <code className="text-foreground">forty_2</code> for the two 40 times
+        (<code className="text-foreground">40_1</code> /{" "}
+        <code className="text-foreground">40_2</code> also work). Blank cells
+        just mean not timed. The whole file is checked before anything is
+        saved.
       </p>
 
       <label
@@ -171,7 +183,15 @@ export function CsvImport({ takenJerseys }: { takenJerseys: number[] }) {
       {phase.kind === "done" && (
         <div className="mt-4 rounded-md border border-success/40 bg-success/10 p-3">
           <p className="text-sm font-semibold text-foreground">
-            Imported <span className="tnum">{phase.inserted}</span> prospects.
+            Imported <span className="tnum">{phase.inserted}</span> prospects
+            {phase.importedTimes > 0 && (
+              <>
+                {" "}
+                and <span className="tnum">{phase.importedTimes}</span> 40
+                time{phase.importedTimes === 1 ? "" : "s"}
+              </>
+            )}
+            .
           </p>
           <button
             type="button"

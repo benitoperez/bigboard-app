@@ -92,7 +92,7 @@ export function Dial({
       </div>
 
       {label && (
-        <span className="mt-1 text-[11px] font-bold tracking-wide text-primary uppercase">
+        <span className="mt-1 text-xs font-bold tracking-wide text-primary uppercase">
           {label}
         </span>
       )}

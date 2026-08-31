@@ -149,7 +149,7 @@ function RatingCell({ prospect }: { prospect: ProspectRow }) {
       >
         {formatRating(rating)}
       </div>
-      <div className="tnum text-[10px] text-muted-foreground">
+      <div className="tnum text-[11px] text-muted-foreground">
         {rating === null
           ? `${covered} of ${required}`
           : `${inputs} ${inputs === 1 ? "input" : "inputs"}`}

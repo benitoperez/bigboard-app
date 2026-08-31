@@ -6,7 +6,7 @@ import { getOfficer } from "@/lib/auth";
 import { validateRoster, type RowError } from "@/lib/csv/roster";
 
 export type ImportResult =
-  | { ok: true; inserted: number; skippedBlank: number }
+  | { ok: true; inserted: number; importedTimes: number; skippedBlank: number }
   | { ok: false; errors: RowError[] };
 
 /**
@@ -70,16 +70,19 @@ export async function importRoster(
   // (tryout_id, jersey_number) is the last line of defence if two admins
   // import overlapping files at the same moment - the whole insert fails
   // rather than landing half a roster.
-  const { error } = await supabase.from("prospects").insert(
-    result.rows.map((r) => ({
-      tryout_id: tryout.id,
-      jersey_number: r.jersey_number,
-      first_name: r.first_name,
-      last_name: r.last_name,
-      primary_position: r.primary_position,
-      secondary_positions: [],
-    })),
-  );
+  const { data: inserted, error } = await supabase
+    .from("prospects")
+    .insert(
+      result.rows.map((r) => ({
+        tryout_id: tryout.id,
+        jersey_number: r.jersey_number,
+        first_name: r.first_name,
+        last_name: r.last_name,
+        primary_position: r.primary_position,
+        secondary_positions: [],
+      })),
+    )
+    .select("id, jersey_number");
 
   if (error) {
     const duplicate = error.code === "23505";
@@ -96,11 +99,130 @@ export async function importRoster(
     };
   }
 
+  // --- optional 40 times -------------------------------------------------
+  // Prospects and drill_results cannot share one statement, so the two
+  // inserts cannot be one transaction from here. If the times fail, the
+  // prospects just inserted are removed again, which restores the state the
+  // admin started from. Without that, a failure here would leave a roster
+  // imported but silently missing the times the file carried - exactly the
+  // half-done outcome section 12 exists to prevent.
+  const idByJersey = new Map((inserted ?? []).map((p) => [p.jersey_number, p.id]));
+  const drillRows = result.rows.flatMap((r) =>
+    ([1, 2] as const).flatMap((attempt) => {
+      const value = attempt === 1 ? r.forty_1 : r.forty_2;
+      const prospectId = idByJersey.get(r.jersey_number);
+      if (value === null || !prospectId) return [];
+      return [
+        {
+          prospect_id: prospectId,
+          drill_key: "forty",
+          attempt_number: attempt,
+          value,
+          recorded_by: officer.id,
+        },
+      ];
+    }),
+  );
+
+  let importedTimes = 0;
+  if (drillRows.length > 0) {
+    const { error: drillErr } = await supabase
+      .from("drill_results")
+      .insert(drillRows);
+
+    if (drillErr) {
+      await supabase
+        .from("prospects")
+        .delete()
+        .in("id", (inserted ?? []).map((p) => p.id));
+
+      return {
+        ok: false,
+        errors: [
+          {
+            line: 0,
+            message: `The roster imported but the 40 times failed, so the whole import was rolled back. Nothing was saved. (${drillErr.message})`,
+          },
+        ],
+      };
+    }
+    importedTimes = drillRows.length;
+  }
+
   revalidatePath("/players");
   revalidatePath("/");
   return {
     ok: true,
     inserted: result.rows.length,
+    importedTimes,
     skippedBlank: result.skippedBlank,
   };
+}
+
+export type DeleteAllResult =
+  | { ok: true; deleted: number }
+  | { ok: false; error: string };
+
+/**
+ * Delete every prospect in the active tryout.
+ *
+ * ADMIN ONLY, enforced here and by the delete_prospects RLS policy. This is
+ * the most destructive action in the app: it cascades through every rating,
+ * 40 time, selection, and comment in the tryout. It exists because clearing
+ * a test roster one prospect at a time is not workable, but it is guarded by
+ * a typed confirmation rather than a single tap.
+ */
+export async function deleteAllProspects(
+  confirmation: string,
+): Promise<DeleteAllResult> {
+  const { officer } = await getOfficer();
+  if (!officer) return { ok: false, error: "Not signed in." };
+  if (!officer.is_admin) {
+    return { ok: false, error: "Only an admin can clear the roster." };
+  }
+  // Checked on the server too, so the guard is not just a client convenience.
+  if (confirmation.trim().toUpperCase() !== "DELETE") {
+    return { ok: false, error: 'Type DELETE to confirm.' };
+  }
+
+  const supabase = await createClient();
+
+  const { data: tryout } = await supabase
+    .from("tryouts")
+    .select("id")
+    .eq("is_active", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (!tryout) return { ok: false, error: "No active tryout." };
+
+  // Storage sits outside the database cascade, so headshots are removed
+  // explicitly or they are orphaned in the bucket forever.
+  const { data: withPhotos } = await supabase
+    .from("prospects")
+    .select("headshot_url")
+    .eq("tryout_id", tryout.id)
+    .not("headshot_url", "is", null);
+
+  const paths = (withPhotos ?? [])
+    .map((p) => p.headshot_url)
+    .filter((p): p is string => !!p);
+  if (paths.length > 0) {
+    await supabase.storage.from("headshots").remove(paths);
+  }
+
+  const { data: deleted, error } = await supabase
+    .from("prospects")
+    .delete()
+    .eq("tryout_id", tryout.id)
+    .select("id");
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/players");
+  revalidatePath("/selected");
+  revalidatePath("/");
+  revalidatePath("/account");
+  return { ok: true, deleted: deleted?.length ?? 0 };
 }

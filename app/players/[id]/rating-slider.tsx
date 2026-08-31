@@ -99,7 +99,7 @@ export function RatingSlider({
               {attribute.label}
             </span>
             {!hasRated && (
-              <span className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+              <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                 Not rated
               </span>
             )}
@@ -182,10 +182,10 @@ function TeamRating({ attribute }: { attribute: AttributeDetail }) {
       </div>
 
       {raterCount === 0 ? (
-        <p className="mt-1 text-[10px] text-muted-foreground">no ratings</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">no ratings</p>
       ) : (
         <details className="group mt-1">
-          <summary className="min-h-[24px] cursor-pointer list-none text-[10px] text-muted-foreground underline decoration-dotted underline-offset-2">
+          <summary className="min-h-[24px] cursor-pointer list-none text-[11px] text-muted-foreground underline decoration-dotted underline-offset-2">
             {raterCount} {raterCount === 1 ? "rater" : "raters"}
           </summary>
           <div className="absolute right-6 z-10 mt-1 w-44 rounded-md border border-border bg-popover p-2 text-left shadow-lg">
@@ -219,15 +219,15 @@ function SaveIndicator({
   onRetry: () => void;
 }) {
   if (status === "saving")
-    return <span className="text-[11px] text-muted-foreground">Saving...</span>;
+    return <span className="text-xs text-muted-foreground">Saving...</span>;
   if (status === "saved")
-    return <span className="text-[11px] text-success">Saved</span>;
+    return <span className="text-xs text-success">Saved</span>;
   if (status === "error")
     return (
       <button
         type="button"
         onClick={onRetry}
-        className="text-[11px] font-semibold text-destructive underline"
+        className="text-xs font-semibold text-destructive underline"
       >
         Failed - retry
       </button>

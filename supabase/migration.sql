@@ -117,6 +117,17 @@ create policy read_all on comments      for select to authenticated using (true)
 -- Prospects: any officer can add or edit (roster management is collaborative).
 create policy write_prospects on prospects for insert to authenticated with check (true);
 create policy edit_prospects  on prospects for update to authenticated using (true) with check (true);
+-- Delete is ADMIN ONLY, unlike insert and update. Deleting a prospect
+-- cascades and destroys every rating, 40 time, selection, and comment about
+-- him - that is not a collaborative action, it is a destructive one, and it
+-- should not be one mis-tap away for fifteen people.
+-- auth.uid() is wrapped in a subselect so Postgres evaluates it once for the
+-- statement rather than per row.
+create policy delete_prospects on prospects for delete to authenticated
+  using (exists (
+    select 1 from officers o
+    where o.id = (select auth.uid()) and o.is_admin
+  ));
 
 -- Ratings: own rows only.
 create policy ratings_insert on ratings for insert to authenticated

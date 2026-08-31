@@ -127,11 +127,11 @@ function KpiStrip({ prospects }: { prospects: ProspectRow[] }) {
 function Kpi({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <div className="rounded-lg border border-border bg-card p-3">
-      <dt className="text-[10px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
+      <dt className="text-[11px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
         {label}
       </dt>
       <dd className="tnum mt-1 text-2xl font-bold text-foreground">{value}</dd>
-      <dd className="truncate text-[11px] text-muted-foreground">{sub}</dd>
+      <dd className="truncate text-xs text-muted-foreground">{sub}</dd>
     </div>
   );
 }
@@ -209,7 +209,7 @@ function Board({
                       #{p.jerseyNumber}
                     </span>
                   </div>
-                  <p className="tnum mt-0.5 text-[11px] text-muted-foreground">
+                  <p className="tnum mt-0.5 text-xs text-muted-foreground">
                     {gated
                       ? `${r.covered} of ${r.required} inputs`
                       : `${r.inputs} ${r.inputs === 1 ? "input" : "inputs"}`}

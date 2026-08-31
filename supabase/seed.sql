@@ -25,7 +25,7 @@
 -- screen. is_active drives which tryout the app loads by default.
 
 insert into tryouts (name, tryout_date, is_active)
-values ('2025 Fall Tryouts', '2025-09-13', true);
+values ('2026 Fall Tryouts', '2026-09-13', true);
 
 
 -- ---- One officer ----------------------------------------------

@@ -165,11 +165,11 @@ function AttemptField({
     <div className="flex-1">
       <label
         htmlFor={`forty-${attemptNumber}`}
-        className="flex items-center gap-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase"
+        className="flex items-center gap-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
       >
         Attempt {attemptNumber}
         {isBest && (
-          <span className="rounded-full bg-primary/15 px-1.5 text-[9px] font-bold text-primary">
+          <span className="rounded-full bg-primary/15 px-1.5 text-[10px] font-bold text-primary">
             BEST
           </span>
         )}
@@ -197,7 +197,7 @@ function AttemptField({
                    disabled:opacity-50"
       />
       {error && (
-        <p role="alert" className="mt-1 text-[11px] text-destructive">
+        <p role="alert" className="mt-1 text-xs text-destructive">
           {error}
         </p>
       )}
