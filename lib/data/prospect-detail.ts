@@ -49,6 +49,10 @@ export type ProspectDetail = {
   speedPercentile: number | null;
   /** False until enough of the class is timed for a percentile to mean anything. */
   percentileIsValid: boolean;
+  /** How many prospects in this tryout have a 40, for the gating message. */
+  timedCount: number;
+  /** Individual attempts, indexed by attempt number. Max MAX_FORTY_ATTEMPTS. */
+  fortyAttempts: { attemptNumber: number; value: number }[];
 };
 
 function isPositionKey(v: unknown): v is PositionKey {
@@ -71,8 +75,12 @@ export async function getProspectDetail(
 
   if (!p || !isPositionKey(p.primary_position)) return null;
 
-  const [{ data: aggRows }, { data: rawRatings }, { data: speed }] =
-    await Promise.all([
+  const [
+    { data: aggRows },
+    { data: rawRatings },
+    { data: speed },
+    { data: attemptRows },
+  ] = await Promise.all([
       supabase
         .from("prospect_attribute_ratings")
         .select("attribute_key, team_rating, rater_count")
@@ -89,6 +97,12 @@ export async function getProspectDetail(
         .select("best_forty, avg_forty, speed_percentile, timed_count")
         .eq("prospect_id", prospectId)
         .maybeSingle(),
+      supabase
+        .from("drill_results")
+        .select("attempt_number, value")
+        .eq("prospect_id", prospectId)
+        .eq("drill_key", "forty")
+        .order("attempt_number", { ascending: true }),
     ]);
 
   const secondaryPositions = (p.secondary_positions ?? []).filter(isPositionKey);
@@ -174,5 +188,10 @@ export async function getProspectDetail(
     avgForty: speed?.avg_forty != null ? Number(speed.avg_forty) : null,
     speedPercentile,
     percentileIsValid,
+    timedCount,
+    fortyAttempts: (attemptRows ?? []).map((a) => ({
+      attemptNumber: a.attempt_number,
+      value: Number(a.value),
+    })),
   };
 }

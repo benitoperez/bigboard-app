@@ -7,6 +7,7 @@ import { Avatar, PositionChip } from "@/components/avatar";
 import { Dial } from "@/components/dial";
 import { RatingSlider } from "./rating-slider";
 import { AddPosition } from "./add-position";
+import { FortyEntry } from "./forty-entry";
 
 export default async function ProspectPage({
   params,
@@ -89,39 +90,30 @@ export default async function ProspectPage({
           />
         </div>
 
-        {/* Speed strip. Styled apart from the position scores on purpose:
-            this is a measurement, not an opinion, and the design should say
-            so. Entry arrives in build order step 8. */}
-        <div className="mt-4 rounded-md border border-border-strong bg-secondary px-3 py-2">
+        {/* Speed strip. Styled apart from the dials on purpose: this is a
+            measurement, not an opinion, and the design should say so. It
+            carries only the headline fact - the 40 section below owns both
+            attempts and the editing. */}
+        <div className="mt-4 flex items-baseline gap-2 rounded-md border border-border-strong bg-secondary px-3 py-2">
           <p className="text-[10px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
-            40 Yard Dash
+            40
           </p>
           {p.bestForty === null ? (
-            <p className="mt-1 text-sm text-muted-foreground">No time recorded</p>
+            <p className="text-sm text-muted-foreground">Not timed</p>
           ) : (
-            <p className="tnum mt-1 text-lg font-bold text-foreground">
-              {p.bestForty.toFixed(2)}{" "}
-              <span className="text-xs font-normal text-muted-foreground">best</span>
-              {p.avgForty !== null && (
-                <>
-                  {" / "}
-                  {p.avgForty.toFixed(2)}{" "}
-                  <span className="text-xs font-normal text-muted-foreground">avg</span>
-                </>
-              )}
-              {p.speedPercentile !== null && (
-                <span className="text-sm font-normal text-muted-foreground">
-                  {" "}
-                  &middot; {ordinal(p.speedPercentile)} percentile
+            <>
+              <p className="tnum text-lg font-bold text-foreground">
+                {p.bestForty.toFixed(2)}
+                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                  s
                 </span>
-              )}
-            </p>
-          )}
-          {p.bestForty !== null && !p.percentileIsValid && (
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Percentile hidden until {MIN_TIMED_FOR_PERCENTILE} prospects are
-              timed.
-            </p>
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {p.speedPercentile !== null
+                  ? `${ordinal(p.speedPercentile)} percentile in this tryout`
+                  : `percentile at ${MIN_TIMED_FOR_PERCENTILE} timed`}
+              </p>
+            </>
           )}
         </div>
       </header>
@@ -149,9 +141,19 @@ export default async function ProspectPage({
         </div>
       </section>
 
+      {/* ---- 40 section (SPEC.md section 10.3) ---- */}
+      <FortyEntry
+        prospectId={p.id}
+        attempts={p.fortyAttempts}
+        bestForty={p.bestForty}
+        avgForty={p.avgForty}
+        speedPercentile={p.speedPercentile}
+        percentileIsValid={p.percentileIsValid}
+        timedCount={p.timedCount}
+      />
+
       <p className="mt-6 pb-4 text-xs text-muted-foreground">
-        40 entry lands in step 8, the select control in step 9, comments in
-        step 11.
+        The select control lands in step 9, comments in step 11.
       </p>
     </main>
   );
