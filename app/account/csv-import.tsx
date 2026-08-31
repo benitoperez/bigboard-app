@@ -2,7 +2,12 @@
 
 import { useRef, useState, useTransition } from "react";
 import Papa from "papaparse";
-import { REQUIRED_COLUMNS, validateRoster, type RowError } from "@/lib/csv/roster";
+import {
+  REQUIRED_COLUMNS,
+  OPTIONAL_COLUMNS,
+  validateRoster,
+  type RowError,
+} from "@/lib/csv/roster";
 import { importRoster, type ImportResult } from "./actions";
 
 type Phase =
@@ -10,7 +15,13 @@ type Phase =
   | { kind: "parsing" }
   | { kind: "errors"; errors: RowError[]; fileName: string }
   | { kind: "ready"; records: Record<string, unknown>[]; headers: string[]; count: number; skippedBlank: number; fileName: string }
-  | { kind: "done"; inserted: number; importedTimes: number; skippedBlank: number };
+  | {
+      kind: "done";
+      inserted: number;
+      importedTimes: number;
+      importedSelections: number;
+      skippedBlank: number;
+    };
 
 export function CsvImport({ takenJerseys }: { takenJerseys: number[] }) {
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
@@ -69,6 +80,7 @@ export function CsvImport({ takenJerseys }: { takenJerseys: number[] }) {
           kind: "done",
           inserted: res.inserted,
           importedTimes: res.importedTimes,
+          importedSelections: res.importedSelections,
           skippedBlank: res.skippedBlank,
         });
         if (fileInput.current) fileInput.current.value = "";
@@ -82,16 +94,22 @@ export function CsvImport({ takenJerseys }: { takenJerseys: number[] }) {
     <section className="rounded-lg border border-border bg-card p-4">
       <h2 className="text-xl uppercase">Import Roster</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Required columns:{" "}
+        Required:{" "}
         <code className="text-foreground">{REQUIRED_COLUMNS.join(", ")}</code>.
       </p>
       <p className="mt-1 text-sm text-muted-foreground">
-        Optional: <code className="text-foreground">forty_1</code> and{" "}
-        <code className="text-foreground">forty_2</code> for the two 40 times
-        (<code className="text-foreground">40_1</code> /{" "}
-        <code className="text-foreground">40_2</code> also work). Blank cells
-        just mean not timed. The whole file is checked before anything is
-        saved.
+        Optional:{" "}
+        <code className="text-foreground">{OPTIONAL_COLUMNS.join(", ")}</code>.
+      </p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        <code className="text-foreground">positions</code> is the multi-select
+        cell, quoted and comma separated &mdash;{" "}
+        <code className="text-foreground">&quot;WR, DB&quot;</code>. The first
+        value is his primary position. Labels like{" "}
+        <code className="text-foreground">R (Rush)</code> are fine.{" "}
+        <code className="text-foreground">selected</code> accepts TRUE / 1 and
+        puts him straight on the team list. The whole file is checked before
+        anything is saved.
       </p>
 
       <label
@@ -186,9 +204,14 @@ export function CsvImport({ takenJerseys }: { takenJerseys: number[] }) {
             Imported <span className="tnum">{phase.inserted}</span> prospects
             {phase.importedTimes > 0 && (
               <>
-                {" "}
-                and <span className="tnum">{phase.importedTimes}</span> 40
-                time{phase.importedTimes === 1 ? "" : "s"}
+                , <span className="tnum">{phase.importedTimes}</span> 40 time
+                {phase.importedTimes === 1 ? "" : "s"}
+              </>
+            )}
+            {phase.importedSelections > 0 && (
+              <>
+                , and <span className="tnum">{phase.importedSelections}</span>{" "}
+                onto the team list
               </>
             )}
             .

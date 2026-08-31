@@ -6,7 +6,13 @@ import { getOfficer } from "@/lib/auth";
 import { validateRoster, type RowError } from "@/lib/csv/roster";
 
 export type ImportResult =
-  | { ok: true; inserted: number; importedTimes: number; skippedBlank: number }
+  | {
+      ok: true;
+      inserted: number;
+      importedTimes: number;
+      importedSelections: number;
+      skippedBlank: number;
+    }
   | { ok: false; errors: RowError[] };
 
 /**
@@ -79,7 +85,7 @@ export async function importRoster(
         first_name: r.first_name,
         last_name: r.last_name,
         primary_position: r.primary_position,
-        secondary_positions: [],
+        secondary_positions: r.secondary_positions,
       })),
     )
     .select("id, jersey_number");
@@ -124,37 +130,69 @@ export async function importRoster(
     }),
   );
 
+  const selectionRows = result.rows.flatMap((r) => {
+    const prospectId = idByJersey.get(r.jersey_number);
+    if (!r.selected || !prospectId) return [];
+    return [
+      {
+        tryout_id: tryout.id,
+        prospect_id: prospectId,
+        selected_by: officer.id,
+      },
+    ];
+  });
+
+  /**
+   * Undo the prospects just inserted. drill_results and selections both
+   * cascade from prospects, so this one delete unwinds the whole import and
+   * restores the state the admin started from.
+   */
+  async function rollback(reason: string): Promise<ImportResult> {
+    await supabase
+      .from("prospects")
+      .delete()
+      .in("id", (inserted ?? []).map((p) => p.id));
+    return {
+      ok: false,
+      errors: [
+        {
+          line: 0,
+          message: `${reason} The whole import was rolled back and nothing was saved.`,
+        },
+      ],
+    };
+  }
+
   let importedTimes = 0;
   if (drillRows.length > 0) {
     const { error: drillErr } = await supabase
       .from("drill_results")
       .insert(drillRows);
-
     if (drillErr) {
-      await supabase
-        .from("prospects")
-        .delete()
-        .in("id", (inserted ?? []).map((p) => p.id));
-
-      return {
-        ok: false,
-        errors: [
-          {
-            line: 0,
-            message: `The roster imported but the 40 times failed, so the whole import was rolled back. Nothing was saved. (${drillErr.message})`,
-          },
-        ],
-      };
+      return rollback(`The 40 times failed to save (${drillErr.message}).`);
     }
     importedTimes = drillRows.length;
   }
 
+  let importedSelections = 0;
+  if (selectionRows.length > 0) {
+    const { error: selErr } = await supabase
+      .from("selections")
+      .insert(selectionRows);
+    if (selErr) {
+      return rollback(`The team list failed to save (${selErr.message}).`);
+    }
+    importedSelections = selectionRows.length;
+  }
+
   revalidatePath("/players");
+  revalidatePath("/selected");
   revalidatePath("/");
   return {
     ok: true,
     inserted: result.rows.length,
     importedTimes,
+    importedSelections,
     skippedBlank: result.skippedBlank,
   };
 }

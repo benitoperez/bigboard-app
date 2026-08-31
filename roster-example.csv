@@ -1,7 +1,7 @@
-first_name,last_name,jersey_number,primary_position,forty_1,forty_2
-Marcus,Reid,17,QB,4.72,4.68
-DeShawn,Carter,21,WR,4.51,
-Jordan,Hayes,23,DB,4.63,4.59
-Tyler,Brooks,25,LB,4.88,
-Amir,Jackson,27,R,4.55,4.61
-Connor,Walsh,31,OL,5.34,
+first_name,last_name,jersey_number,positions,forty_1,forty_2,selected
+Marcus,Reid,17,"QB",4.72,4.68,TRUE
+DeShawn,Carter,21,"WR, DB",4.51,,
+Jordan,Hayes,23,"DB, WR",4.63,4.59,TRUE
+Tyler,Brooks,25,"LB",4.88,,FALSE
+Amir,Jackson,27,"R (Rush), LB",,,1
+Connor,Walsh,31,"OL, LB",5.34,5.41,

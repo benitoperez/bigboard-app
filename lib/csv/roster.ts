@@ -3,13 +3,17 @@ import { POSITIONS, type PositionKey } from "@/lib/config/positions";
 /**
  * Roster CSV validation - SPEC.md section 12.
  *
+ * The source is a Google Sheets export. That shapes the format: positions
+ * arrive as one quoted multi-select cell, and the sheet already carries 40
+ * times and a selection flag.
+ *
  * The whole file is validated before anything is inserted. A partial import
  * leaves a roster that is half right, at night, mid-tryout, and untangling it
  * means knowing which rows made it. Rejecting the file outright is worse for
  * thirty seconds and better for the next hour.
  *
- * Pure on purpose: no Supabase, no papaparse. The dirty-data cases are the
- * hard part here, not the parsing, so they need to be testable directly.
+ * Pure on purpose: no Supabase, no papaparse. The dirty data is the hard part
+ * here, not the parsing, so it needs to be testable directly.
  * See scripts/verify-roster.ts.
  */
 
@@ -17,29 +21,32 @@ export const REQUIRED_COLUMNS = [
   "first_name",
   "last_name",
   "jersey_number",
-  "primary_position",
+  "positions",
 ] as const;
 
+export const OPTIONAL_COLUMNS = ["forty_1", "forty_2", "selected"] as const;
+
 /**
- * Optional 40 yard dash columns. Real tryout spreadsheets already carry
- * these, so importing them saves re-entering a hundred times by hand.
- *
- * Several spellings are accepted because the header in a real Excel export is
- * whatever the person who made it typed.
+ * Accepted spellings for the optional columns. A real sheet header is
+ * whatever the person who built it typed.
  */
-export const FORTY_COLUMNS = {
-  1: ["forty_1", "forty1", "40_1", "401", "forty_time_1", "40 time 1", "forty 1"],
-  2: ["forty_2", "forty2", "40_2", "402", "forty_time_2", "40 time 2", "forty 2"],
-} as const;
+const COLUMN_ALIASES: Record<string, readonly string[]> = {
+  forty_1: ["forty_1", "forty1", "40_1", "401", "forty_time_1", "40 time 1", "forty 1"],
+  forty_2: ["forty_2", "forty2", "40_2", "402", "forty_time_2", "40 time 2", "forty 2"],
+  selected: ["selected", "select", "is_selected", "team", "keep"],
+};
 
 export type RosterRow = {
   first_name: string;
   last_name: string;
   jersey_number: number;
+  /** First value from the positions cell. */
   primary_position: PositionKey;
-  /** Null when the column is absent or the cell is blank. */
+  /** The rest, deduped, never containing the primary. */
+  secondary_positions: PositionKey[];
   forty_1: number | null;
   forty_2: number | null;
+  selected: boolean;
 };
 
 export type RowError = {
@@ -55,16 +62,24 @@ export type ValidationResult =
 const VALID_POSITIONS = Object.keys(POSITIONS) as PositionKey[];
 
 /**
- * Reads a 40 time under any of its accepted header spellings.
- * Returns undefined when no such column exists at all.
+ * "R (Rush)" -> "R", "  wr " -> "WR".
+ *
+ * A sheet built for humans labels its options the way a human reads them, so
+ * the parenthetical gloss is stripped rather than making someone re-type the
+ * column before every import.
  */
-function readForty(
+export function normalizePosition(raw: string): string {
+  return raw.replace(/\([^)]*\)/g, "").trim().toUpperCase();
+}
+
+/** Read a column under any of its accepted spellings. */
+function readColumn(
   rec: Record<string, unknown>,
-  attempt: 1 | 2,
+  canonical: string,
 ): string | undefined {
+  const accepted = COLUMN_ALIASES[canonical] ?? [canonical];
   for (const key of Object.keys(rec)) {
-    const norm = key.trim().toLowerCase();
-    if ((FORTY_COLUMNS[attempt] as readonly string[]).includes(norm)) {
+    if (accepted.includes(key.trim().toLowerCase())) {
       return String(rec[key] ?? "").trim();
     }
   }
@@ -112,8 +127,8 @@ export function validateRoster(
   records.forEach((rec, i) => {
     const line = i + 2; // +1 for zero-index, +1 for the header row
 
-    // SPEC.md section 12: trailing blank rows are ignored, not an error.
-    // Spreadsheet exports are full of them.
+    // Trailing blank rows are ignored, not an error. Spreadsheet exports are
+    // full of them.
     if (isBlankRecord(rec)) {
       skippedBlank++;
       return;
@@ -124,7 +139,7 @@ export function validateRoster(
     const first = get("first_name");
     const last = get("last_name");
     const jerseyRaw = get("jersey_number");
-    const posRaw = get("primary_position");
+    const positionsRaw = get("positions");
 
     if (!first) errors.push({ line, message: "first_name is empty." });
     if (!last) errors.push({ line, message: "last_name is empty." });
@@ -141,44 +156,71 @@ export function validateRoster(
     } else {
       jersey = Number(jerseyRaw);
       if (jersey < 0 || jersey > 999) {
-        errors.push({
-          line,
-          message: `jersey_number ${jersey} is out of range.`,
-        });
+        errors.push({ line, message: `jersey_number ${jersey} is out of range.` });
+        jersey = null;
       } else if (seenJerseys.has(jersey)) {
         errors.push({
           line,
           message: `jersey_number ${jersey} is already used on line ${seenJerseys.get(jersey)}.`,
         });
+        jersey = null;
       } else if (existingJerseys.has(jersey)) {
         errors.push({
           line,
           message: `jersey_number ${jersey} is already taken in this tryout.`,
         });
+        jersey = null;
       } else {
         seenJerseys.set(jersey, line);
       }
     }
 
-    // --- position ---
-    // Compared against POSITIONS, never a list written out here.
-    const pos = posRaw.toUpperCase() as PositionKey;
-    if (!posRaw) {
-      errors.push({ line, message: "primary_position is empty." });
-    } else if (!VALID_POSITIONS.includes(pos)) {
+    // --- positions (multi-select cell) ---
+    // First value is primary, the rest are secondary. Order is meaningful.
+    let primary: PositionKey | null = null;
+    const secondary: PositionKey[] = [];
+
+    if (!positionsRaw) {
       errors.push({
         line,
-        message: `primary_position "${posRaw}" is not a known position. Valid: ${VALID_POSITIONS.join(", ")}.`,
+        message: `positions is empty. Expected something like "WR, DB".`,
       });
+    } else {
+      const parts = positionsRaw
+        .split(",")
+        .map((x) => normalizePosition(x))
+        .filter((x) => x.length > 0);
+
+      if (parts.length === 0) {
+        errors.push({ line, message: "positions has no usable values." });
+      }
+
+      const seen = new Set<PositionKey>();
+      for (const part of parts) {
+        if (!VALID_POSITIONS.includes(part as PositionKey)) {
+          errors.push({
+            line,
+            message: `position "${part}" is not a known position. Valid: ${VALID_POSITIONS.join(", ")}.`,
+          });
+          continue;
+        }
+        const key = part as PositionKey;
+        // Duplicates within a cell collapse; a prospect cannot be his own
+        // secondary position.
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (primary === null) primary = key;
+        else secondary.push(key);
+      }
     }
 
     // --- optional 40 times ---
-    // A blank cell means "not timed", which is not an error. A cell with
-    // something unparseable in it IS an error - silently dropping a time the
-    // user believes they imported is worse than refusing the file.
+    // A blank cell means not timed. Something unparseable IS an error -
+    // silently dropping a time the user believes they imported is worse than
+    // refusing the file.
     const forty: Record<1 | 2, number | null> = { 1: null, 2: null };
     for (const attempt of [1, 2] as const) {
-      const raw = readForty(rec, attempt);
+      const raw = readColumn(rec, `forty_${attempt}`);
       if (raw === undefined || raw === "") continue;
       if (!/^\d{1,2}(\.\d{1,2})?$/.test(raw)) {
         errors.push({
@@ -199,14 +241,31 @@ export function validateRoster(
       forty[attempt] = v;
     }
 
-    if (first && last && jersey !== null && VALID_POSITIONS.includes(pos)) {
+    // --- optional selected flag ---
+    let selected = false;
+    const selRaw = readColumn(rec, "selected");
+    if (selRaw !== undefined && selRaw !== "") {
+      const v = selRaw.toLowerCase();
+      if (v === "true" || v === "1") selected = true;
+      else if (v === "false" || v === "0") selected = false;
+      else {
+        errors.push({
+          line,
+          message: `selected "${selRaw}" is not recognized. Use TRUE, true, 1, FALSE, false, 0, or leave it blank.`,
+        });
+      }
+    }
+
+    if (first && last && jersey !== null && primary !== null) {
       rows.push({
         first_name: first,
         last_name: last,
         jersey_number: jersey,
-        primary_position: pos,
+        primary_position: primary,
+        secondary_positions: secondary,
         forty_1: forty[1],
         forty_2: forty[2],
+        selected,
       });
     }
   });
