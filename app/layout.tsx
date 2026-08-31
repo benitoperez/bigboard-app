@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Barlow, Barlow_Condensed, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { TabBar } from "@/components/tab-bar";
 
 // Families and weights come from the Figma Make source, src/styles/fonts.css.
 // Loaded via next/font so they are self-hosted rather than render-blocking
@@ -45,7 +46,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${barlow.variable} ${barlowCondensed.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <div className="mx-auto flex w-full max-w-lg flex-1 flex-col">
+          {children}
+        </div>
+        <TabBar />
+      </body>
     </html>
   );
 }

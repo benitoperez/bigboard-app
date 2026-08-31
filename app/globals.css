@@ -103,6 +103,11 @@
   --color-rating-poor:  #EF4444;  /* <60     red           [figma] */
   --color-rating-none:  #64748B;  /* unrated gray          [figma] */
 
+  /* ---- Semantic status. Figma defines destructive only; success and
+     warning reuse its chart green and amber so the palette stays closed. */
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+
   /* ---- Position / avatar chips (Figma chart palette) ---- */
   --color-chip-cyan:   #00D4FF;
   --color-chip-green:  #22C55E;
