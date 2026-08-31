@@ -1,10 +1,12 @@
+import Link from "next/link";
 import { getOfficer } from "@/lib/auth";
 import { signOut } from "@/app/login/actions";
+import { getActiveTryout, getProspects, type ProspectRow } from "@/lib/data/prospects";
+import { BOARD_ORDER, POSITIONS, type PositionKey } from "@/lib/config/positions";
+import { Avatar } from "@/components/avatar";
+import { Dial } from "@/components/dial";
+import { compareForBoard } from "@/lib/ratings";
 
-/**
- * Placeholder home. The real position boards are build order step 10
- * (SPEC.md section 10.1) - this exists so step 3 is verifiable on its own.
- */
 export default async function HomePage() {
   const { userId, officer } = await getOfficer();
 
@@ -13,7 +15,7 @@ export default async function HomePage() {
   // letting it surface later as a mystery permissions error.
   if (userId && !officer) {
     return (
-      <main className="safe-top safe-bottom flex min-h-dvh flex-col justify-center px-6">
+      <main className="safe-top flex min-h-dvh flex-col justify-center px-6">
         <div className="mx-auto w-full max-w-sm rounded-lg border border-destructive/40 bg-destructive/10 p-6">
           <h1 className="text-2xl text-foreground">Account not finished</h1>
           <p className="mt-3 text-sm text-muted-foreground">
@@ -37,35 +39,192 @@ export default async function HomePage() {
     );
   }
 
+  const tryout = await getActiveTryout();
+  if (!tryout) {
+    return (
+      <main className="safe-top px-6 py-8">
+        <h1 className="text-4xl tracking-tight uppercase">Big Board</h1>
+        <p className="mt-6 text-sm text-muted-foreground">
+          No active tryout yet.
+        </p>
+      </main>
+    );
+  }
+
+  const prospects = await getProspects(tryout.id);
+
   return (
-    <main className="safe-top safe-bottom flex min-h-dvh flex-col px-6 py-8">
+    <main className="safe-top px-6 py-8">
       <header>
         <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
-          Signed in
+          {tryout.name}
         </p>
-        <h1 className="mt-1 text-4xl tracking-tight text-foreground uppercase">
-          {officer?.display_name}
-        </h1>
-        {officer?.is_admin && (
-          <span className="mt-2 inline-block rounded-full bg-primary/15 px-3 py-1 text-xs font-bold tracking-wide text-primary uppercase">
-            Admin
-          </span>
-        )}
+        <h1 className="mt-1 text-4xl tracking-tight uppercase">Big Board</h1>
       </header>
 
-      <p className="mt-8 text-sm text-muted-foreground">
-        Auth and route protection are wired up. Position boards land in build
-        order step 10.
-      </p>
+      <KpiStrip prospects={prospects} />
 
-      <form action={signOut} className="mt-auto pt-8">
-        <button
-          type="submit"
-          className="min-h-tap w-full rounded-md border border-border px-4 text-sm font-semibold text-foreground"
-        >
-          Sign Out
-        </button>
-      </form>
+      {prospects.length === 0 ? (
+        <p className="mt-8 text-sm text-muted-foreground">
+          No prospects yet. Import a roster from the Account screen.
+        </p>
+      ) : (
+        <div className="mt-6 space-y-6">
+          {/* SPEC.md section 10.1: boards render in BOARD_ORDER, so priority
+              positions reorder from config without touching this file. */}
+          {BOARD_ORDER.map((position) => (
+            <Board key={position} position={position} prospects={prospects} />
+          ))}
+        </div>
+      )}
     </main>
+  );
+}
+
+/**
+ * SPEC.md section 10.1: fastest 40 in the class, most-rated prospect, total
+ * prospects, total ratings logged.
+ */
+function KpiStrip({ prospects }: { prospects: ProspectRow[] }) {
+  const timed = prospects.filter((p) => p.bestForty !== null);
+  const fastest = timed.length
+    ? timed.reduce((a, b) => (a.bestForty! <= b.bestForty! ? a : b))
+    : null;
+
+  const inputsFor = (p: ProspectRow) =>
+    Object.values(p.attributeRatings).reduce(
+      (sum, a) => sum + (a?.raterCount ?? 0),
+      0,
+    );
+
+  const totalRatings = prospects.reduce((sum, p) => sum + inputsFor(p), 0);
+  const mostRated = prospects.length
+    ? prospects.reduce((a, b) => (inputsFor(a) >= inputsFor(b) ? a : b))
+    : null;
+
+  return (
+    <dl className="mt-4 grid grid-cols-2 gap-2">
+      <Kpi
+        label="Fastest 40"
+        value={fastest ? fastest.bestForty!.toFixed(2) : "--"}
+        sub={fastest ? `#${fastest.jerseyNumber} ${fastest.lastName}` : "none timed"}
+      />
+      <Kpi
+        label="Most rated"
+        value={mostRated ? String(inputsFor(mostRated)) : "0"}
+        sub={
+          mostRated && inputsFor(mostRated) > 0
+            ? `#${mostRated.jerseyNumber} ${mostRated.lastName}`
+            : "no ratings yet"
+        }
+      />
+      <Kpi label="Prospects" value={String(prospects.length)} sub="in this tryout" />
+      <Kpi label="Ratings logged" value={String(totalRatings)} sub="across all officers" />
+    </dl>
+  );
+}
+
+function Kpi({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-3">
+      <dt className="text-[10px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
+        {label}
+      </dt>
+      <dd className="tnum mt-1 text-2xl font-bold text-foreground">{value}</dd>
+      <dd className="truncate text-[11px] text-muted-foreground">{sub}</dd>
+    </div>
+  );
+}
+
+/**
+ * One position board - SPEC.md section 10.1.
+ *
+ * Sorted by RAW score descending, never by the 45-99 display number: the band
+ * compresses real gaps, so two prospects can share a display value while one
+ * is genuinely ahead. Section 8 is explicit about this.
+ *
+ * Gated prospects sort to the bottom and render grayed out rather than being
+ * hidden, so officers can see who still needs eyes on them.
+ */
+function Board({
+  position,
+  prospects,
+}: {
+  position: PositionKey;
+  prospects: ProspectRow[];
+}) {
+  const rows = prospects
+    .filter((p) => p.playedPositions.includes(position))
+    .map((p) => ({ p, r: p.ratingsByPosition[position]! }))
+    .sort((a, b) =>
+      compareForBoard(
+        { raw: a.r.raw, jerseyNumber: a.p.jerseyNumber },
+        { raw: b.r.raw, jerseyNumber: b.p.jerseyNumber },
+      ),
+    );
+
+  if (rows.length === 0) return null;
+
+  const ranked = rows.filter((x) => x.r.rating !== null).length;
+
+  return (
+    <section>
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-sm font-bold tracking-wide text-primary uppercase">
+          {POSITIONS[position].label}
+        </h2>
+        <span className="tnum text-xs text-muted-foreground">
+          {ranked} of {rows.length} rated
+        </span>
+      </div>
+
+      <ol className="mt-2 divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+        {rows.map(({ p, r }, i) => {
+          const gated = r.rating === null;
+          return (
+            <li key={p.id}>
+              <Link
+                href={`/players/${p.id}`}
+                className={
+                  "flex min-h-tap-large items-center gap-3 px-3 py-2 active:bg-secondary " +
+                  (gated ? "opacity-45" : "")
+                }
+              >
+                <span className="tnum w-5 shrink-0 text-right text-xs text-muted-foreground">
+                  {gated ? "" : i + 1}
+                </span>
+
+                <Avatar
+                  jerseyNumber={p.jerseyNumber}
+                  headshotUrl={p.headshotUrl}
+                  name={p.fullName}
+                />
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="truncate font-semibold text-foreground">
+                      {p.fullName}
+                    </span>
+                    <span className="tnum shrink-0 text-xs text-muted-foreground">
+                      #{p.jerseyNumber}
+                    </span>
+                  </div>
+                  <p className="tnum mt-0.5 text-[11px] text-muted-foreground">
+                    {gated
+                      ? `${r.covered} of ${r.required} inputs`
+                      : `${r.inputs} ${r.inputs === 1 ? "input" : "inputs"}`}
+                    {p.bestForty !== null && (
+                      <> &middot; {p.bestForty.toFixed(2)} forty</>
+                    )}
+                  </p>
+                </div>
+
+                <Dial rating={r.rating} size="sm" />
+              </Link>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }

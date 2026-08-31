@@ -28,6 +28,14 @@ export type ProspectRow = {
   headshotUrl: string | null;
   /** Rating at the prospect's PRIMARY position - what the directory shows. */
   primary: PositionRating;
+  /**
+   * Rating at EVERY position this prospect plays. A prospect trying out at
+   * WR and DB belongs on both boards, carrying a different number on each,
+   * because the weights differ per position.
+   */
+  ratingsByPosition: Partial<Record<PositionKey, PositionRating>>;
+  /** Every position played, primary first. */
+  playedPositions: PositionKey[];
   /** What is still missing, for the progress label when primary.rating is null. */
   missing: string[];
   bestForty: number | null;
@@ -124,6 +132,19 @@ export async function getProspects(tryoutId: string): Promise<ProspectRow[]> {
         ? Number(speed.speed_percentile)
         : null;
 
+    const playedPositions: PositionKey[] = [
+      p.primary_position,
+      ...secondaryPositions,
+    ];
+    const ratingsByPosition: Partial<Record<PositionKey, PositionRating>> = {};
+    for (const pos of playedPositions) {
+      ratingsByPosition[pos] = computePositionRating(
+        pos,
+        attributeRatings,
+        speedPercentile,
+      );
+    }
+
     return [
       {
         id: p.id,
@@ -134,11 +155,9 @@ export async function getProspects(tryoutId: string): Promise<ProspectRow[]> {
         primaryPosition: p.primary_position,
         secondaryPositions,
         headshotUrl: p.headshot_url,
-        primary: computePositionRating(
-          p.primary_position,
-          attributeRatings,
-          speedPercentile,
-        ),
+        primary: ratingsByPosition[p.primary_position]!,
+        ratingsByPosition,
+        playedPositions,
         missing: missingComponents(
           p.primary_position,
           attributeRatings,

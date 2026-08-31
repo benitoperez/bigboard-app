@@ -11,7 +11,11 @@
  *   npm run verify:rating
  */
 
-import { computePositionRating, type AttributeRatings } from "../lib/ratings";
+import {
+  computePositionRating,
+  compareForBoard,
+  type AttributeRatings,
+} from "../lib/ratings";
 import type { PositionKey } from "../lib/config/positions";
 
 let failures = 0;
@@ -152,6 +156,54 @@ check(
   "different raw, identical display - sorting on display would tie them",
   a.rating === b.rating && (a.raw ?? 0) < (b.raw ?? 0) ? "ok" : "no",
   "ok",
+);
+
+// ---- Board ordering - SPEC.md sections 8 and 10.1 ----------------------
+console.log("\n--- board ordering ---");
+check(
+  "higher raw wins even when the display number ties",
+  "raw 74.0 and 74.5 both display 85; #20 holds the higher raw",
+  [
+    { raw: 74.0, jerseyNumber: 10 },
+    { raw: 74.5, jerseyNumber: 20 },
+  ].sort(compareForBoard)[0].jerseyNumber,
+  20,
+);
+check(
+  "gated sorts below a rated prospect, however low",
+  "an unrated prospect never outranks a real 50",
+  [
+    { raw: null, jerseyNumber: 1 },
+    { raw: 50, jerseyNumber: 99 },
+  ].sort(compareForBoard)[0].jerseyNumber,
+  99,
+);
+check(
+  "two gated prospects order stably by jersey",
+  "they have no meaningful ranking and must not appear to",
+  [
+    { raw: null, jerseyNumber: 42 },
+    { raw: null, jerseyNumber: 7 },
+  ]
+    .sort(compareForBoard)
+    .map((x) => x.jerseyNumber)
+    .join(","),
+  "7,42",
+);
+check(
+  "full board: rated descending, then gated by jersey",
+  "90, 75, 60, then the two gated ones",
+  [
+    { raw: 60, jerseyNumber: 3 },
+    { raw: null, jerseyNumber: 4 },
+    { raw: 90, jerseyNumber: 5 },
+    { raw: null, jerseyNumber: 1 },
+    { raw: 75, jerseyNumber: 6 },
+  ]
+    .sort(compareForBoard)
+    .map((r) => r.jerseyNumber)
+    .join(","),
+  "5,6,3,1,4",
 );
 
 console.log("\n" + "=".repeat(70));

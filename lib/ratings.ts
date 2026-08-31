@@ -88,6 +88,30 @@ export function computePositionRating(
 }
 
 /**
+ * Board ordering - SPEC.md sections 8 and 10.1.
+ *
+ * Sorts on `raw`, NEVER on the 45-99 display band. The band compresses real
+ * differences, so two prospects can share a display number while one is
+ * genuinely ahead; sorting on the display value would present that as a tie
+ * and order them arbitrarily.
+ *
+ * Gated prospects (raw === null) sort to the bottom rather than being
+ * hidden, so officers can see who still needs eyes on them. Among themselves
+ * they order by jersey number, which is stable - two gated prospects have no
+ * meaningful ranking and should not appear to.
+ */
+export function compareForBoard(
+  a: { raw: number | null; jerseyNumber: number },
+  b: { raw: number | null; jerseyNumber: number },
+): number {
+  if (a.raw === null && b.raw === null) return a.jerseyNumber - b.jerseyNumber;
+  if (a.raw === null) return 1;
+  if (b.raw === null) return -1;
+  if (a.raw !== b.raw) return b.raw - a.raw;
+  return a.jerseyNumber - b.jerseyNumber; // stable tiebreak
+}
+
+/**
  * Which required components are still missing, for the progress label the
  * UI shows in place of a gated rating - e.g. "4 of 6 inputs - missing
  * route running".
