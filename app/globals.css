@@ -164,6 +164,81 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ============================================================
+   RATING SLIDER - SPEC.md section 14
+
+   Generous handle, because this is operated one-handed, often gloved,
+   in direct sunlight. The whole control keeps a 44px touch target even
+   though the visible track is thinner.
+
+   No transitions on the thumb: it must track the finger exactly.
+   Anything easing the handle toward the pointer reads as lag.
+   ============================================================ */
+
+.bb-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  height: var(--spacing-tap);
+  cursor: pointer;
+  touch-action: none; /* stop the page scrolling while dragging */
+}
+
+/* Track: filled to --pct in brand cyan, remainder in the raised surface. */
+.bb-slider::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--primary) 0,
+    var(--primary) var(--pct),
+    var(--secondary) var(--pct),
+    var(--secondary) 100%
+  );
+}
+
+.bb-slider::-moz-range-track {
+  height: 10px;
+  border-radius: 9999px;
+  background: var(--secondary);
+}
+.bb-slider::-moz-range-progress {
+  height: 10px;
+  border-radius: 9999px;
+  background: var(--primary);
+}
+
+.bb-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: var(--spacing-slider-handle);
+  width: var(--spacing-slider-handle);
+  border-radius: 9999px;
+  background: var(--foreground);
+  border: 3px solid var(--primary);
+  /* Centre the thumb on the 10px track. */
+  margin-top: calc((10px - var(--spacing-slider-handle)) / 2);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.5);
+}
+
+.bb-slider::-moz-range-thumb {
+  height: var(--spacing-slider-handle);
+  width: var(--spacing-slider-handle);
+  border-radius: 9999px;
+  background: var(--foreground);
+  border: 3px solid var(--primary);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.5);
+}
+
+.bb-slider:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.bb-slider:focus-visible::-moz-range-thumb {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
