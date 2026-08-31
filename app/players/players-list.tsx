@@ -1,0 +1,170 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { BOARD_ORDER, type PositionKey } from "@/lib/config/positions";
+import { Avatar, PositionChip } from "@/components/avatar";
+import type { ProspectRow } from "@/lib/data/prospects";
+
+/** SPEC.md section 10.2: search matches on jersey number OR name, both. */
+function matches(p: ProspectRow, q: string) {
+  const needle = q.trim().toLowerCase();
+  if (!needle) return true;
+  if (String(p.jerseyNumber).startsWith(needle)) return true;
+  return p.fullName.toLowerCase().includes(needle);
+}
+
+export function PlayersList({ prospects }: { prospects: ProspectRow[] }) {
+  const [query, setQuery] = useState("");
+  const [position, setPosition] = useState<PositionKey | null>(null);
+
+  const visible = useMemo(
+    () =>
+      prospects.filter(
+        (p) =>
+          matches(p, query) &&
+          (position === null ||
+            p.primaryPosition === position ||
+            p.secondaryPositions.includes(position)),
+      ),
+    [prospects, query, position],
+  );
+
+  return (
+    <>
+      <div className="mt-4">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search name or number..."
+          aria-label="Search prospects by name or jersey number"
+          autoCapitalize="none"
+          autoCorrect="off"
+          className="min-h-tap w-full rounded-md border border-border bg-input px-4 text-base
+                     text-foreground placeholder:text-muted-foreground outline-none
+                     focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40"
+        />
+      </div>
+
+      {/* Position filter chips. Order comes from BOARD_ORDER so priority
+          positions can be reordered in config without touching this file. */}
+      <div className="-mx-6 mt-3 flex gap-2 overflow-x-auto px-6 pb-1">
+        <FilterChip
+          label="All"
+          active={position === null}
+          onClick={() => setPosition(null)}
+        />
+        {BOARD_ORDER.map((p) => (
+          <FilterChip
+            key={p}
+            label={p}
+            active={position === p}
+            onClick={() => setPosition(position === p ? null : p)}
+          />
+        ))}
+      </div>
+
+      <p className="mt-4 text-xs font-semibold tracking-[0.15em] text-muted-foreground uppercase">
+        {visible.length} {visible.length === 1 ? "Athlete" : "Athletes"}
+      </p>
+
+      <ul className="mt-2 divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+        {visible.map((p) => (
+          <li key={p.id}>
+            <Link
+              href={`/players/${p.id}`}
+              className="flex min-h-tap-large items-center gap-3 px-3 py-3 active:bg-secondary"
+            >
+              <Avatar
+                jerseyNumber={p.jerseyNumber}
+                headshotUrl={p.headshotUrl}
+                name={p.fullName}
+              />
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-2">
+                  <span className="truncate font-semibold text-foreground">
+                    {p.fullName}
+                  </span>
+                  <span className="tnum shrink-0 text-sm text-muted-foreground">
+                    #{p.jerseyNumber}
+                  </span>
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-1">
+                  <PositionChip position={p.primaryPosition} />
+                  {p.secondaryPositions.map((s) => (
+                    <PositionChip key={s} position={s} muted />
+                  ))}
+                </div>
+              </div>
+
+              <RatingCell prospect={p} />
+            </Link>
+          </li>
+        ))}
+
+        {visible.length === 0 && (
+          <li className="px-4 py-10 text-center text-sm text-muted-foreground">
+            No prospects match that search.
+          </li>
+        )}
+      </ul>
+    </>
+  );
+}
+
+/**
+ * SPEC.md section 8: never show a rating that is not fully covered. Show the
+ * gap instead - it stops a barely-rated 91 outranking a fully-vetted 84, and
+ * it nudges officers toward filling holes.
+ */
+function RatingCell({ prospect }: { prospect: ProspectRow }) {
+  const { rating, inputs, covered, required } = prospect.primary;
+
+  if (rating === null) {
+    return (
+      <div className="shrink-0 text-right">
+        <div className="tnum text-xl font-bold text-rating-none">--</div>
+        <div className="text-[10px] text-muted-foreground">
+          {covered} of {required}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="shrink-0 text-right">
+      <div className="tnum text-xl font-bold text-foreground">{rating}</div>
+      <div className="tnum text-[10px] text-muted-foreground">
+        {inputs} {inputs === 1 ? "input" : "inputs"}
+      </div>
+    </div>
+  );
+}
+
+function FilterChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={
+        "min-h-tap shrink-0 rounded-full px-4 text-sm font-bold tracking-wide uppercase transition-colors " +
+        (active
+          ? "bg-primary text-primary-foreground"
+          : "border border-border bg-card text-muted-foreground")
+      }
+    >
+      {label}
+    </button>
+  );
+}

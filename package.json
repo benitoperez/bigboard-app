@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "verify:rating": "tsx scripts/verify-rating.ts"
+    "verify:rating": "tsx scripts/verify-rating.ts",
+    "seed:dev": "tsx scripts/seed-dev.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",
