@@ -1,5 +1,13 @@
 # Big Board — Working Rules
 
+**New to this repo? Read `HANDOFF.md` first.** It carries the current state,
+the RLS policy map and why its asymmetries are deliberate, the traps that cost
+time during the build (Next 16's `proxy.ts`, the client/server import
+boundary, `getClaims`), and an honest list of what is and is not verified.
+`SPEC.md` is the source of truth for behaviour; `HANDOFF.md` covers everything
+the spec does not.
+
+
 Mobile web app for running flag football tryouts. Officers rate prospects from
 their phones on the field; the app turns ratings into positional boards.
 
