@@ -31,7 +31,7 @@ This is the consolidated list; nothing breaks that is not on it.
 | B7 | Speed/40 is a special case: one hardcoded drill, `drill_key default 'forty'`, weight key `"speed"` (SPEC §3, §5) | Generalized measured drills, N per template, each with a direction flag and per-position weights like judged attributes. The flag football seed maps the v1 `speed` weight to the `forty` drill |
 | B8 | `drill_results` CHECK `value > 0 and value < 20` (SPEC §5) | Forty-specific range dies. Per-drill `value_min`/`value_max` live on `template_drills`; DB keeps only `value > 0` |
 | B9 | `prospect_speed` view, forty-only, always lower-is-better (SPEC §7) | Generalized `prospect_drill_stats` view, per drill, direction-aware |
-| B10 | Any officer can add prospects; admin deletes (HANDOFF §5) | INSERT/DELETE prospects → admin+. UPDATE stays evaluator+ (the add-position button and headshots need it). Viewer writes nothing, anywhere |
+| B10 | Any authenticated user can add/edit prospects; admin deletes (HANDOFF §5) | INSERT/UPDATE prospects → evaluator+ within the org; DELETE stays admin+. Viewer writes nothing, anywhere |
 | B11 | Anyone authenticated can record/correct drill times (SPEC §5) | Evaluator+ **within the org** only |
 | B12 | Gating thresholds and board order are compile-time constants (SPEC §4) | Per-template DB columns (`min_ratings_for_display`, per-drill `min_timed_for_percentile`, `max_attempts`, position `sort_order`) seeded from the v1 constants |
 | B13 | `PositionKey` / `AttributeKey` are static TS union types | Positions and attribute keys become runtime strings validated against the tryout's template. Type safety shifts from the compiler to load-time validation |
@@ -115,8 +115,8 @@ create table invite_codes (
 | Record / correct drill times | | ✔ | ✔ | ✔ |
 | Select / deselect prospects | | ✔ | ✔ | ✔ |
 | Comment (delete own only) | | ✔ | ✔ | ✔ |
-| Edit prospects (positions, headshots) | | ✔ | ✔ | ✔ |
-| Add prospects (manual + CSV import) | | | ✔ | ✔ |
+| Add / edit prospects (manual add, positions, headshots) | | ✔ | ✔ | ✔ |
+| CSV import | | | ✔ | ✔ |
 | Hard-delete prospects and their data | | | ✔ | ✔ |
 | Create / manage tryout classes | | | ✔ | ✔ |
 | Edit template (positions, attributes, drills, weights) | | | ✔ | ✔ |
@@ -133,11 +133,10 @@ they transfer ownership first (the one-owner index makes any other path a
 constraint violation, which is the point).
 
 - **⚠ BREAKS V1 (B1):** the flat "every officer is equal" model is gone.
-- **⚠ BREAKS V1 (B10):** manual prospect add moves from any-officer to
-  admin+. Prospect UPDATE stays evaluator+ so the profile's add-position
-  button and headshot upload keep working for the people on the field.
-  *Decision point flagged for review: if evaluators should still add
-  athletes by hand mid-tryout, say so and INSERT drops to evaluator+.*
+- **⚠ BREAKS V1 (B10):** prospect add/edit narrows from any authenticated
+  user to evaluator+ within the org. Evaluators keep manual athlete add,
+  the add-position button, and headshot upload; viewers write nothing.
+  CSV import and prospect deletion stay admin+.
 
 ### 2.3 Invite codes
 
@@ -213,7 +212,7 @@ re-expressed per role. Do not "tidy" them.
 | `memberships` | member (see own org's roster) | via RPC only | via RPC only | admin+ removing ≤ their tier; any member deleting **own** row (leave org, owner blocked) |
 | `invite_codes` | admin+ | migration/RPC only | admin+ (rotate) | none |
 | `tryouts` | member | admin+ | admin+ | **none** (still the historical record) |
-| `prospects` | member | admin+ | evaluator+ | admin+ |
+| `prospects` | member | evaluator+ | evaluator+ | admin+ |
 | `ratings` | member | evaluator+ **and own** | own | own |
 | `drill_results` | member | evaluator+ self-stamped | evaluator+ (any row) | evaluator+ (any row) |
 | `selections` | member | evaluator+ self-stamped | — | evaluator+ (any row) |
@@ -249,7 +248,7 @@ nothing from the caller. All are single transactions.
 
 - `create_org(name text, template_slug text) returns uuid` — requires a
   confirmed session and (for v2's copy-on-create model) a valid seed slug
-  (`flag_football` | `scratch`); creates the org, copies the seed template
+  (`flag_football` | `baseball` | `scratch`); creates the org, copies the seed template
   into it (§3.5), inserts the caller as **owner**, generates both invite
   codes.
 - `join_org(code text) returns uuid` — looks up the code, inserts the
@@ -761,8 +760,9 @@ real owner), two browser profiles:
    viewer; rotated code stops joining immediately; pre-rotation members
    remain; there is no code that yields admin.
 3. **Role boundaries, per §2.2:** viewer cannot write anything (UI *and*
-   direct API); evaluator can rate/time/select/comment but not import,
-   delete prospects, or touch templates; admin cannot demote another
+   direct API); evaluator can rate/time/select/comment and add or edit
+   athletes by hand, but not import CSV, delete prospects, or touch
+   templates; admin cannot demote another
    admin or the owner; owner-only paths (promote admin, transfer, delete
    org) refuse everyone else. Own-rows-only on `ratings` and `comments`
    tested across two accounts — closing v1's unclosed gap #1 in the same
