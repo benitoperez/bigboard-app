@@ -1,26 +1,119 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ============================================================
+   BIG BOARD — DESIGN TOKENS
+
+   Colors are sampled directly from the Figma mockup exports in
+   reference/. Values marked [FIGMA] still need confirming against
+   the source file via the Figma MCP — see reference/README.md.
+
+   Screens are style-only. Structure comes from SPEC.md.
+   ============================================================ */
+
+@theme {
+  /* ---- Surfaces -------------------------------------------------
+     Sampled: #121622 is 45% of all mockup pixels (the ground),
+     #070d19 sits beneath it, #1c202c is the raised card. */
+  --color-bg:             #070d19;
+  --color-surface:        #121622;
+  --color-surface-raised: #1c202c;
+  --color-surface-high:   #232833;
+  --color-border:         #2b313e;
+  --color-border-strong:  #3a4152;
+
+  /* ---- Text ---- */
+  --color-text:           #ffffff;
+  --color-text-secondary: #8b93a7;
+  --color-text-muted:     #4d5464;
+
+  /* ---- Brand accent (Save CTA, active tab, focus) ---- */
+  --color-accent:         #2cc0eb;
+  --color-accent-bright:  #00b6ff;
+  --color-accent-deep:    #1884e0;
+  --color-accent-deepest: #0080ff;
+
+  /* ---- Rating scale — SPEC.md section 14 ------------------------
+     One pure function maps a number to exactly one of these.
+     Never hand-pick a rating color at a call site. */
+  --color-rating-elite: #19c37d;  /* 90+     deep green   */
+  --color-rating-high:  #2bb460;  /* 80-89   medium green */
+  --color-rating-good:  #7dd47f;  /* 75-79   pale green   */
+  --color-rating-mid:   #e8c13c;  /* 70-74   yellow       */
+  --color-rating-low:   #ec920a;  /* 60-69   orange       */
+  --color-rating-poor:  #e5484d;  /* <60     red          */
+  --color-rating-none:  #4d5464;  /* unrated neutral gray */
+
+  /* ---- Position / avatar chips ---- */
+  --color-chip-cyan:   #2cc0eb;
+  --color-chip-blue:   #1884e0;
+  --color-chip-purple: #9144ec;
+  --color-chip-pink:   #e13484;
+  --color-chip-orange: #ec920a;
+  --color-chip-green:  #2bb460;
+  --color-chip-teal:   #0fa9ab;
+
+  /* ---- Semantic ---- */
+  --color-success: #2bb460;
+  --color-warning: #ec920a;
+  --color-danger:  #e5484d;
+
+  /* ---- Radii [FIGMA: confirm exact values] ---- */
+  --radius-chip:   9999px;
+  --radius-sm:     8px;
+  --radius-md:     12px;
+  --radius-card:   16px;
+  --radius-lg:     20px;
+  --radius-sheet:  24px;
+
+  /* ---- Tap targets — SPEC.md section 14 -------------------------
+     44px floor. Gloved hands in sunlight. Slider handles go larger. */
+  --spacing-tap:        44px;
+  --spacing-tap-large:  56px;
+  --spacing-slider-handle: 32px;
+
+  /* ---- Type scale [FIGMA: font family is UNCONFIRMED] -----------
+     The mockup uses a squared/techy face for numerals and a bold
+     display face for screen titles. That cannot be read out of a
+     JPG — pull the real families from Figma before shipping. */
+  --font-sans:    var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-numeric: var(--font-geist-mono), ui-monospace, monospace;
+
+  --text-display:  32px;   /* screen titles: "Leaderboard", "Athletes" */
+  --text-eyebrow:  11px;   /* "2025 SEASON", "TOP OVERALL"            */
+  --text-dial:     22px;   /* number inside a rating dial             */
+  --text-stat:     28px;   /* KPI numerals, 40 times                  */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/* ============================================================
+   BASE
+   ============================================================ */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--color-bg);
+  /* Stop iOS from inflating text in landscape. */
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  /* Field use: no accidental text selection while tapping sliders. */
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* Respect the notch and the home indicator. */
+.safe-top    { padding-top: env(safe-area-inset-top); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+/* Tabular numerals everywhere a number is compared down a column —
+   ratings, 40 times, jersey numbers. Stops digits from jittering. */
+.tnum { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
