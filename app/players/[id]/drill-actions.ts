@@ -58,8 +58,14 @@ export async function saveDrillAttempt(
   attemptNumber: number,
   raw: string,
 ): Promise<DrillResult> {
-  const { officer } = await getOfficer();
-  if (!officer) return { ok: false, error: "Not signed in." };
+  const { profile, is_evaluator } = await getOfficer();
+  if (!profile) return { ok: false, error: "Not signed in." };
+
+  // Viewers are read-only. The RLS policy is what actually enforces this;
+  // refusing here turns a silent policy rejection into a clear message.
+  if (!is_evaluator) {
+    return { ok: false, error: "Your role in this organization is read-only." };
+  }
 
   const resolved = await resolveDrill(prospectId, drillKey);
   if ("error" in resolved) return { ok: false, error: resolved.error };
@@ -95,7 +101,7 @@ export async function saveDrillAttempt(
       drill_key: drill.key,
       attempt_number: attemptNumber,
       value,
-      recorded_by: officer.id,
+      recorded_by: profile.id,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "prospect_id,drill_key,attempt_number" },
@@ -127,8 +133,14 @@ export async function deleteDrillAttempt(
   drillKey: string,
   attemptNumber: number,
 ): Promise<DrillResult> {
-  const { officer } = await getOfficer();
-  if (!officer) return { ok: false, error: "Not signed in." };
+  const { profile, is_evaluator } = await getOfficer();
+  if (!profile) return { ok: false, error: "Not signed in." };
+
+  // Viewers are read-only. The RLS policy is what actually enforces this;
+  // refusing here turns a silent policy rejection into a clear message.
+  if (!is_evaluator) {
+    return { ok: false, error: "Your role in this organization is read-only." };
+  }
 
   const resolved = await resolveDrill(prospectId, drillKey);
   if ("error" in resolved) return { ok: false, error: resolved.error };

@@ -1,15 +1,27 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-/** Paths reachable without a session. Everything else redirects to /login. */
-const PUBLIC_PATHS = ["/login", "/auth"];
+/**
+ * Paths reachable without a session. Everything else redirects to /login.
+ *
+ * v2 adds public signup, so /signup and the confirmation screens join the
+ * list. /auth holds the confirmation callback, which by definition runs
+ * before a session exists.
+ */
+const PUBLIC_PATHS = ["/login", "/signup", "/confirm-email", "/auth"];
 
 /**
  * Refreshes the Supabase session on every request and gates the app.
  *
- * SPEC.md section 11: every route except the login page is behind an auth
+ * SPEC.md section 11: every route except the public ones is behind an auth
  * check. This is that check - doing it here rather than per-page means a new
  * screen is protected by default instead of by remembering to protect it.
+ *
+ * It gates on the SESSION only. The other two v2 gates - email confirmed,
+ * and belongs to at least one org (SPEC-V2.md section 4) - need a database
+ * read, and doing that here would put a query on every request including
+ * asset-adjacent ones. They live in requireOrg() instead, which every
+ * authenticated page already calls to get its actor.
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -60,8 +72,14 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Already signed in and sitting on the login page - send them home.
-  if (user && request.nextUrl.pathname.startsWith("/login")) {
+  // Already signed in and sitting on the login or signup page - send them
+  // home. The confirmation screens are excluded: a signed-in but
+  // unconfirmed account genuinely belongs on /confirm-email.
+  if (
+    user &&
+    (request.nextUrl.pathname.startsWith("/login") ||
+      request.nextUrl.pathname.startsWith("/signup"))
+  ) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "";

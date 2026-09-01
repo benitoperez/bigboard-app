@@ -26,8 +26,14 @@ export async function addAthlete(input: {
   primaryPosition: string;
   secondaryPositions: string[];
 }): Promise<AddAthleteResult> {
-  const { officer } = await getOfficer();
-  if (!officer) return { ok: false, error: "Not signed in." };
+  const { profile, is_evaluator } = await getOfficer();
+  if (!profile) return { ok: false, error: "Not signed in." };
+
+  // Viewers are read-only. The RLS policy is what actually enforces this;
+  // refusing here turns a silent policy rejection into a clear message.
+  if (!is_evaluator) {
+    return { ok: false, error: "Your role in this organization is read-only." };
+  }
 
   const first = input.firstName.trim();
   const last = input.lastName.trim();

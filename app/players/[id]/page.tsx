@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { getOfficer } from "@/lib/auth";
+import { notFound } from "next/navigation";
+import { requireOrg } from "@/lib/auth";
 import { getProspectDetail } from "@/lib/data/prospect-detail";
 import { getActiveTryout } from "@/lib/data/tryouts";
 import { getSelectedIds } from "@/lib/data/selections";
@@ -21,10 +21,9 @@ export default async function ProspectPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { officer } = await getOfficer();
-  if (!officer) redirect("/login");
+  const { profile, is_admin, is_evaluator } = await requireOrg();
 
-  const detail = await getProspectDetail(id, officer.id);
+  const detail = await getProspectDetail(id, profile!.id);
   if (!detail) notFound();
   const { template, prospect: p } = detail;
 
@@ -80,6 +79,7 @@ export default async function ProspectPage({
             </div>
 
             {/* SPEC.md section 10.4: the add control also lives here. */}
+            {is_evaluator && (
             <div className="mt-3 flex items-center gap-2">
               <SelectToggle
                 prospectId={p.id}
@@ -91,6 +91,7 @@ export default async function ProspectPage({
                 {selectedIds.has(p.id) ? "On the team list" : "Add to team list"}
               </span>
             </div>
+            )}
           </div>
 
           {/* Primary position dial, larger than the secondaries. */}
@@ -118,6 +119,7 @@ export default async function ProspectPage({
               missing={r.missing}
             />
           ))}
+          {is_evaluator && (
           <AddPosition
             prospectId={p.id}
             taken={[p.primaryPosition, ...p.secondaryPositions]}
@@ -126,10 +128,11 @@ export default async function ProspectPage({
               .sort((a, b) => a.sortOrder - b.sortOrder)
               .map((tp) => ({ code: tp.code, label: tp.label }))}
           />
+          )}
         </div>
 
         {/* SPEC.md section 13: optional, and nothing blocks on it. */}
-        {tryout && (
+        {tryout && is_evaluator && (
           <HeadshotUpload
             prospectId={p.id}
             tryoutId={tryout.id}
@@ -175,7 +178,15 @@ export default async function ProspectPage({
         )}
       </header>
 
+      {!is_evaluator && (
+        <p className="mt-6 rounded-md border border-border bg-secondary px-4 py-3 text-sm text-muted-foreground">
+          Your role in this organization is read-only. Ratings, drill results,
+          comments and the team list are visible but not editable.
+        </p>
+      )}
+
       {/* ---- Rating section ---- */}
+      {is_evaluator && (
       <section className="mt-6">
         <h2 className="text-xs font-semibold tracking-[0.15em] text-muted-foreground uppercase">
           Your Ratings
@@ -192,26 +203,28 @@ export default async function ProspectPage({
               key={a.key}
               attribute={a}
               prospectId={p.id}
-              officerId={officer.id}
+              officerId={profile!.id}
             />
           ))}
         </div>
       </section>
+      )}
 
       {/* ---- Measured drills (SPEC.md section 10.3) ---- */}
-      <DrillEntry prospectId={p.id} drills={p.drills} />
+      {is_evaluator && <DrillEntry prospectId={p.id} drills={p.drills} />}
 
       {/* ---- Comments (SPEC.md section 10.3) ---- */}
       <div>
         <Comments
           prospectId={p.id}
           comments={comments}
-          officerId={officer.id}
+          officerId={profile!.id}
+          canComment={is_evaluator}
         />
       </div>
 
       {/* Destructive, admin only, and last on the page on purpose. */}
-      {officer.is_admin && (
+      {is_admin && (
         <div className="pb-4">
           <DeleteProspect
             prospectId={p.id}

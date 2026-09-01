@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getProspects } from "@/lib/data/prospects";
+import { requireOrg } from "@/lib/auth";
 import { getActiveTryout } from "@/lib/data/tryouts";
 import { tryoutPeriod } from "@/lib/tryouts";
 import { getSelectedIds } from "@/lib/data/selections";
@@ -10,6 +11,8 @@ import { boardOrder } from "@/lib/template";
 export const metadata: Metadata = { title: "Players - Big Board" };
 
 export default async function PlayersPage() {
+  await requireOrg();
+
   const tryout = await getActiveTryout();
 
   if (!tryout) {

@@ -32,11 +32,11 @@ export async function importRoster(
   records: Record<string, unknown>[],
   headers: string[],
 ): Promise<ImportResult> {
-  const { officer } = await getOfficer();
-  if (!officer) {
+  const { profile, is_admin } = await getOfficer();
+  if (!profile) {
     return { ok: false, errors: [{ line: 0, message: "Not signed in." }] };
   }
-  if (!officer.is_admin) {
+  if (!is_admin) {
     return {
       ok: false,
       errors: [{ line: 0, message: "Only an admin can import a roster." }],
@@ -135,7 +135,7 @@ export async function importRoster(
                 drill_key: drillKey,
                 attempt_number: i + 1,
                 value,
-                recorded_by: officer.id,
+                recorded_by: profile.id,
               },
             ],
       ),
@@ -149,7 +149,7 @@ export async function importRoster(
       {
         tryout_id: tryout.id,
         prospect_id: prospectId,
-        selected_by: officer.id,
+        selected_by: profile.id,
       },
     ];
   });
@@ -225,9 +225,9 @@ export type DeleteAllResult =
 export async function deleteAllProspects(
   confirmation: string,
 ): Promise<DeleteAllResult> {
-  const { officer } = await getOfficer();
-  if (!officer) return { ok: false, error: "Not signed in." };
-  if (!officer.is_admin) {
+  const { profile, is_admin } = await getOfficer();
+  if (!profile) return { ok: false, error: "Not signed in." };
+  if (!is_admin) {
     return { ok: false, error: "Only an admin can clear the roster." };
   }
   // Checked on the server too, so the guard is not just a client convenience.

@@ -13,10 +13,17 @@ export function Comments({
   prospectId,
   comments,
   officerId,
+  canComment = true,
 }: {
   prospectId: string;
   comments: Comment[];
   officerId: string;
+  /**
+   * Viewers read the thread but cannot post. The comments_insert policy is
+   * what enforces that; hiding the box keeps a viewer from typing a note
+   * that would only be rejected on submit.
+   */
+  canComment?: boolean;
 }) {
   const router = useRouter();
   const [body, setBody] = useState("");
@@ -117,6 +124,7 @@ export function Comments({
         </div>
 
         {/* Input pinned below the list. */}
+        {canComment && (
         <form
           onSubmit={submit}
           className="flex items-end gap-2 border-t border-border p-3"
@@ -153,6 +161,7 @@ export function Comments({
             {pending ? "..." : "Post"}
           </button>
         </form>
+        )}
 
         {error && (
           <p role="alert" className="px-3 pb-3 text-xs text-destructive">

@@ -22,9 +22,9 @@ export type DeleteResult = { ok: false; error: string };
 export async function deleteProspect(
   prospectId: string,
 ): Promise<DeleteResult> {
-  const { officer } = await getOfficer();
-  if (!officer) return { ok: false, error: "Not signed in." };
-  if (!officer.is_admin) {
+  const { profile, is_admin } = await getOfficer();
+  if (!profile) return { ok: false, error: "Not signed in." };
+  if (!is_admin) {
     return { ok: false, error: "Only an admin can delete a prospect." };
   }
 

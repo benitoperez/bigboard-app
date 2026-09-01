@@ -18,8 +18,14 @@ export async function addSecondaryPosition(
   prospectId: string,
   position: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const { officer } = await getOfficer();
-  if (!officer) return { ok: false, error: "Not signed in." };
+  const { profile, is_evaluator } = await getOfficer();
+  if (!profile) return { ok: false, error: "Not signed in." };
+
+  // Viewers are read-only. The RLS policy is what actually enforces this;
+  // refusing here turns a silent policy rejection into a clear message.
+  if (!is_evaluator) {
+    return { ok: false, error: "Your role in this organization is read-only." };
+  }
 
   const supabase = await createClient();
 
@@ -61,8 +67,14 @@ export async function removeSecondaryPosition(
   prospectId: string,
   position: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const { officer } = await getOfficer();
-  if (!officer) return { ok: false, error: "Not signed in." };
+  const { profile, is_evaluator } = await getOfficer();
+  if (!profile) return { ok: false, error: "Not signed in." };
+
+  // Viewers are read-only. The RLS policy is what actually enforces this;
+  // refusing here turns a silent policy rejection into a clear message.
+  if (!is_evaluator) {
+    return { ok: false, error: "Your role in this organization is read-only." };
+  }
 
   const supabase = await createClient();
   const { data: p } = await supabase

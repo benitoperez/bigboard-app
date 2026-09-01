@@ -20,8 +20,14 @@ export async function setHeadshotPath(
   prospectId: string,
   path: string,
 ): Promise<HeadshotResult> {
-  const { officer } = await getOfficer();
-  if (!officer) return { ok: false, error: "Not signed in." };
+  const { profile, is_evaluator } = await getOfficer();
+  if (!profile) return { ok: false, error: "Not signed in." };
+
+  // Viewers are read-only. The RLS policy is what actually enforces this;
+  // refusing here turns a silent policy rejection into a clear message.
+  if (!is_evaluator) {
+    return { ok: false, error: "Your role in this organization is read-only." };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -43,8 +49,14 @@ export async function removeHeadshot(
   prospectId: string,
   path: string,
 ): Promise<HeadshotResult> {
-  const { officer } = await getOfficer();
-  if (!officer) return { ok: false, error: "Not signed in." };
+  const { profile, is_evaluator } = await getOfficer();
+  if (!profile) return { ok: false, error: "Not signed in." };
+
+  // Viewers are read-only. The RLS policy is what actually enforces this;
+  // refusing here turns a silent policy rejection into a clear message.
+  if (!is_evaluator) {
+    return { ok: false, error: "Your role in this organization is read-only." };
+  }
 
   const supabase = await createClient();
 

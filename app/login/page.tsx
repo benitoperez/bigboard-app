@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = { title: "Sign In - Big Board" };
@@ -14,9 +15,6 @@ export default async function LoginPage({
     <main className="safe-top safe-bottom flex min-h-dvh flex-col justify-center px-6 py-12">
       <div className="mx-auto w-full max-w-sm">
         <header className="mb-10">
-          <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
-            NCSU Club Flag Football
-          </p>
           <h1 className="mt-1 text-5xl tracking-tight text-foreground uppercase">
             Big Board
           </h1>
@@ -24,9 +22,13 @@ export default async function LoginPage({
 
         <LoginForm next={next ?? "/"} />
 
-        {/* SPEC.md section 11: accounts are created by hand. No signup link. */}
+        {/* SPEC-V2 section 4: v2 opens public signup, so this is a link
+            again. v1 deliberately had none. */}
         <p className="mt-8 text-center text-sm text-muted-foreground">
-          Accounts are created by an admin. Ask an officer if you need access.
+          New here?{" "}
+          <Link href="/signup" className="font-semibold text-primary">
+            Create an account
+          </Link>
         </p>
       </div>
     </main>

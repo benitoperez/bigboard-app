@@ -19,8 +19,14 @@ export async function postComment(
   prospectId: string,
   body: string,
 ): Promise<CommentResult> {
-  const { officer } = await getOfficer();
-  if (!officer) return { ok: false, error: "Not signed in." };
+  const { profile, is_evaluator } = await getOfficer();
+  if (!profile) return { ok: false, error: "Not signed in." };
+
+  // Viewers are read-only. The RLS policy is what actually enforces this;
+  // refusing here turns a silent policy rejection into a clear message.
+  if (!is_evaluator) {
+    return { ok: false, error: "Your role in this organization is read-only." };
+  }
 
   const trimmed = body.trim();
   // Mirrors the CHECK constraint: length between 1 and 1000.
@@ -32,7 +38,7 @@ export async function postComment(
   const supabase = await createClient();
   const { error } = await supabase.from("comments").insert({
     prospect_id: prospectId,
-    officer_id: officer.id,
+    officer_id: profile.id,
     body: trimmed,
   });
 
@@ -55,8 +61,14 @@ export async function deleteComment(
   prospectId: string,
   commentId: string,
 ): Promise<CommentResult> {
-  const { officer } = await getOfficer();
-  if (!officer) return { ok: false, error: "Not signed in." };
+  const { profile, is_evaluator } = await getOfficer();
+  if (!profile) return { ok: false, error: "Not signed in." };
+
+  // Viewers are read-only. The RLS policy is what actually enforces this;
+  // refusing here turns a silent policy rejection into a clear message.
+  if (!is_evaluator) {
+    return { ok: false, error: "Your role in this organization is read-only." };
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase

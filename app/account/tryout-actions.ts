@@ -25,9 +25,9 @@ export async function createTryout(
   year: number | null,
   semester: string,
 ): Promise<TryoutResult> {
-  const { officer } = await getOfficer();
-  if (!officer) return { ok: false, error: "Not signed in." };
-  if (!officer.is_admin) {
+  const { profile, is_admin } = await getOfficer();
+  if (!profile) return { ok: false, error: "Not signed in." };
+  if (!is_admin) {
     return { ok: false, error: "Only an admin can create a tryout class." };
   }
 
@@ -80,9 +80,9 @@ export async function createTryout(
  * arbitrarily.
  */
 export async function setActiveTryout(tryoutId: string): Promise<SwitchResult> {
-  const { officer } = await getOfficer();
-  if (!officer) return { ok: false, error: "Not signed in." };
-  if (!officer.is_admin) {
+  const { profile, is_admin } = await getOfficer();
+  if (!profile) return { ok: false, error: "Not signed in." };
+  if (!is_admin) {
     return { ok: false, error: "Only an admin can switch the active class." };
   }
 

@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { getOfficer } from "@/lib/auth";
-import { signOut } from "@/app/login/actions";
+import { requireOrg } from "@/lib/auth";
 import { getProspects, type ProspectRow } from "@/lib/data/prospects";
 import { getActiveTryout } from "@/lib/data/tryouts";
 import { tryoutPeriod } from "@/lib/tryouts";
@@ -16,36 +15,10 @@ import { Dial } from "@/components/dial";
 import { compareForBoard } from "@/lib/ratings";
 
 export default async function HomePage() {
-  const { userId, officer } = await getOfficer();
-
-  // Authenticated, but no officers row. Every write would fail an
-  // `officer_id = auth.uid()` policy from here, so say so plainly instead of
-  // letting it surface later as a mystery permissions error.
-  if (userId && !officer) {
-    return (
-      <main className="safe-top flex min-h-dvh flex-col justify-center px-6">
-        <div className="mx-auto w-full max-w-sm rounded-lg border border-destructive/40 bg-destructive/10 p-6">
-          <h1 className="text-2xl text-foreground">Account not finished</h1>
-          <p className="mt-3 text-sm text-muted-foreground">
-            You are signed in, but there is no officer record for this account
-            yet. An admin needs to add a row to <code>officers</code> with your
-            user id.
-          </p>
-          <p className="mt-3 font-mono text-xs break-all text-muted-foreground">
-            {userId}
-          </p>
-          <form action={signOut} className="mt-6">
-            <button
-              type="submit"
-              className="min-h-tap w-full rounded-md border border-border px-4 text-sm font-semibold text-foreground"
-            >
-              Sign Out
-            </button>
-          </form>
-        </div>
-      </main>
-    );
-  }
+  // Redirects to the screen that matches the failure: /login when signed
+  // out, /confirm-email when unconfirmed, /onboarding when they belong to
+  // no org. Every authenticated screen goes through this.
+  await requireOrg();
 
   const tryout = await getActiveTryout();
   if (!tryout) {

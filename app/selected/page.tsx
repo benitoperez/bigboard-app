@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getProspects } from "@/lib/data/prospects";
+import { requireOrg } from "@/lib/auth";
 import { getActiveTryout } from "@/lib/data/tryouts";
 import { tryoutPeriod } from "@/lib/tryouts";
 import { getSelections } from "@/lib/data/selections";
@@ -12,6 +13,8 @@ import { SelectToggle } from "@/components/select-toggle";
 export const metadata: Metadata = { title: "Selected - Big Board" };
 
 export default async function SelectedPage() {
+  await requireOrg();
+
   const tryout = await getActiveTryout();
   if (!tryout) {
     return (
