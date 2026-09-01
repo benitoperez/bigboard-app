@@ -19,7 +19,7 @@ type Phase =
   | {
       kind: "done";
       inserted: number;
-      importedTimes: number;
+      importedResults: number;
       importedSelections: number;
       skippedBlank: number;
     };
@@ -92,7 +92,7 @@ export function CsvImport({
         setPhase({
           kind: "done",
           inserted: res.inserted,
-          importedTimes: res.importedTimes,
+          importedResults: res.importedResults,
           importedSelections: res.importedSelections,
           skippedBlank: res.skippedBlank,
         });
@@ -114,14 +114,23 @@ export function CsvImport({
         Optional:{" "}
         <code className="text-foreground">{optionalColumns(template).join(", ")}</code>.
       </p>
+      {/* The drill columns change with the sport, so the header this
+          template actually expects is shown rather than described. */}
+      <div className="mt-3 overflow-x-auto rounded-md border border-border bg-input p-2">
+        <code className="tnum block whitespace-pre text-xs text-muted-foreground">
+          {exampleCsv(template)}
+        </code>
+      </div>
+
       <p className="mt-2 text-sm text-muted-foreground">
         <code className="text-foreground">positions</code> is the multi-select
         cell, quoted and comma separated &mdash;{" "}
         <code className="text-foreground">&quot;WR, DB&quot;</code>. The first
-        value is his primary position. Labels like{" "}
+        value is their primary position. Labels like{" "}
         <code className="text-foreground">R (Rush)</code> are fine.{" "}
         <code className="text-foreground">selected</code> accepts TRUE / 1 and
-        puts him straight on the team list. The whole file is checked before
+        puts them straight on the team list. Drill columns are optional and a
+        blank cell means not measured. The whole file is checked before
         anything is saved.
       </p>
 
@@ -215,10 +224,10 @@ export function CsvImport({
         <div className="mt-4 rounded-md border border-success/40 bg-success/10 p-3">
           <p className="text-sm font-semibold text-foreground">
             Imported <span className="tnum">{phase.inserted}</span> prospects
-            {phase.importedTimes > 0 && (
+            {phase.importedResults > 0 && (
               <>
-                , <span className="tnum">{phase.importedTimes}</span> 40 time
-                {phase.importedTimes === 1 ? "" : "s"}
+                , <span className="tnum">{phase.importedResults}</span> drill
+                result{phase.importedResults === 1 ? "" : "s"}
               </>
             )}
             {phase.importedSelections > 0 && (
@@ -240,4 +249,43 @@ export function CsvImport({
       )}
     </section>
   );
+}
+
+/**
+ * A two-line sample in this template's own shape.
+ *
+ * Column names are derived, not written out: a baseball template asks for
+ * exit_velocity_1 where flag football asks for forty_1, and an admin
+ * building a sheet needs to see the one that applies to them.
+ */
+function exampleCsv(template: Template): string {
+  const positions = template.positions
+    .slice()
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const primary = positions[0]?.code ?? "POS";
+  const secondary = positions[1]?.code;
+
+  // Column names only. Inventing sample measurements would mean inventing
+  // what a good one looks like for a sport this code knows nothing about -
+  // the midpoint of an allowed range is not a realistic value, and a wrong
+  // example is worse than none. The cells are optional anyway: blank means
+  // not measured.
+  const drillCols: string[] = [];
+  for (const d of template.drills) {
+    for (let n = 1; n <= d.maxAttempts; n++) drillCols.push(`${d.key}_${n}`);
+  }
+  const drillVals = drillCols.map(() => "");
+
+  const header = ["first_name", "last_name", "jersey_number", "positions", ...drillCols, "selected"];
+  const row = [
+    "Jordan",
+    "Hayes",
+    "23",
+    secondary ? `"${primary}, ${secondary}"` : `"${primary}"`,
+    ...drillVals,
+    "TRUE",
+  ];
+
+  return `${header.join(",")}
+${row.join(",")}`;
 }

@@ -10,7 +10,7 @@ export type ImportResult =
   | {
       ok: true;
       inserted: number;
-      importedTimes: number;
+      importedResults: number;
       importedSelections: number;
       skippedBlank: number;
     }
@@ -24,9 +24,14 @@ export type ImportResult =
  * a server action is a public endpoint.
  *
  * Note the admin check lives here rather than in RLS. The prospects policies
- * deliberately let any officer insert, because roster management is
- * collaborative (SPEC.md section 5). It is the bulk CSV path specifically
- * that is admin-only, so that restriction belongs at this layer.
+ * deliberately let any EVALUATOR insert, because roster management is
+ * collaborative (SPEC-V2.md section 2.2). It is the bulk CSV path
+ * specifically that is admin-only, so that restriction belongs at this
+ * layer.
+ *
+ * The drill columns come from the tryout's template (SPEC-V2.md B14), so a
+ * baseball sheet carries exit_velocity_1 where a flag football sheet carries
+ * forty_1, and nothing here names either.
  */
 export async function importRoster(
   records: Record<string, unknown>[],
@@ -157,7 +162,8 @@ export async function importRoster(
   /**
    * Undo the prospects just inserted. drill_results and selections both
    * cascade from prospects, so this one delete unwinds the whole import and
-   * restores the state the admin started from.
+   * restores the state the admin started from - however many drills the
+   * template defines.
    */
   async function rollback(reason: string): Promise<ImportResult> {
     await supabase
@@ -175,15 +181,15 @@ export async function importRoster(
     };
   }
 
-  let importedTimes = 0;
+  let importedResults = 0;
   if (drillRows.length > 0) {
     const { error: drillErr } = await supabase
       .from("drill_results")
       .insert(drillRows);
     if (drillErr) {
-      return rollback(`The 40 times failed to save (${drillErr.message}).`);
+      return rollback(`The drill results failed to save (${drillErr.message}).`);
     }
-    importedTimes = drillRows.length;
+    importedResults = drillRows.length;
   }
 
   let importedSelections = 0;
@@ -203,7 +209,7 @@ export async function importRoster(
   return {
     ok: true,
     inserted: result.rows.length,
-    importedTimes,
+    importedResults,
     importedSelections,
     skippedBlank: result.skippedBlank,
   };
