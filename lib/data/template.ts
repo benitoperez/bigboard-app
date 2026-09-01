@@ -72,12 +72,14 @@ export async function getTemplate(templateId: string): Promise<Template | null> 
   if (!tpl) return null;
 
   const attributes: TemplateAttribute[] = (attrRows ?? []).map((a) => ({
+    id: a.id,
     key: a.key,
     label: a.label,
     short: a.short,
   }));
 
   const drills: TemplateDrill[] = (drillRows ?? []).map((d) => ({
+    id: d.id,
     key: d.key,
     label: d.label,
     unit: d.unit,
@@ -119,6 +121,7 @@ export async function getTemplate(templateId: string): Promise<Template | null> 
   }
 
   const positions: TemplatePosition[] = (posRows ?? []).map((p) => ({
+    id: p.id,
     code: p.code,
     label: p.label,
     sortOrder: Number(p.sort_order),

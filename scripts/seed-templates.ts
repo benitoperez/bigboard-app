@@ -119,12 +119,13 @@ function parseSeed(tag: string, sport: string): Template {
   const attributes: TemplateAttribute[] = insertValues(
     block,
     "template_attributes",
-  ).map((t) => ({ key: t[2], label: t[3], short: t[4] }));
+  ).map((t) => ({ id: `attr-${t[2]}`, key: t[2], label: t[3], short: t[4] }));
 
   // (v_tpl, v_sys, key, label, unit, direction, max_attempts,
   //  min_timed_for_percentile, value_min, value_max, decimals)
   const drills: TemplateDrill[] = insertValues(block, "template_drills").map(
     (t) => ({
+      id: `drill-${t[2]}`,
       key: t[2],
       label: t[3],
       unit: t[4],
@@ -139,6 +140,7 @@ function parseSeed(tag: string, sport: string): Template {
 
   // (v_tpl, v_sys, code, label, sort_order)
   const positionRows = insertValues(block, "template_positions").map((t) => ({
+    id: `pos-${t[2]}`,
     code: t[2],
     label: t[3],
     sortOrder: Number(t[4]),

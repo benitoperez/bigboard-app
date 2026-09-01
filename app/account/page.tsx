@@ -12,6 +12,7 @@ import { TryoutManager } from "./tryout-manager";
 import { MembersPanel } from "./members-panel";
 import { InviteCodes } from "./invite-codes";
 import { DeleteOrgPanel, OrgPanel } from "./org-panel";
+import Link from "next/link";
 
 export const metadata: Metadata = { title: "Account - Big Board" };
 
@@ -92,6 +93,27 @@ export default async function AccountPage() {
 
       {/* ---- Admin+: invite codes ---- */}
       {is_admin && inviteCodes.length > 0 && <InviteCodes codes={inviteCodes} />}
+
+      {/* ---- Admin+: the template editor, on its own screen ---- */}
+      {is_admin && template && (
+        <Link
+          href="/account/template"
+          className="mt-4 flex min-h-tap-large items-center justify-between rounded-lg
+                     border border-border bg-card px-4 active:bg-secondary"
+        >
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-foreground">
+              Evaluation template
+            </span>
+            <span className="block truncate text-xs text-muted-foreground">
+              {template.positions.length} positions ·{" "}
+              {template.attributes.length} attributes · {template.drills.length}{" "}
+              drills
+            </span>
+          </span>
+          <span className="shrink-0 text-muted-foreground">&rsaquo;</span>
+        </Link>
+      )}
 
       {/* ---- Admin+: tryout classes, import, destructive data controls ---- */}
       <TryoutManager tryouts={tryouts} isAdmin={is_admin} />

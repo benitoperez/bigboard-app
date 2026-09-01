@@ -15,6 +15,8 @@
 export type DrillDirection = "lower_is_better" | "higher_is_better";
 
 export type TemplateAttribute = {
+  /** Row id. Needed to edit or delete; the KEY is what data rows join on. */
+  id: string;
   key: string;
   label: string;
   /** Short code for dense UI — "CTH", "CON". */
@@ -22,6 +24,8 @@ export type TemplateAttribute = {
 };
 
 export type TemplateDrill = {
+  /** Row id. Needed to edit or delete; the KEY is what data rows join on. */
+  id: string;
   key: string;
   label: string;
   /** "s", "mph". Display only. */
@@ -51,6 +55,8 @@ export type PositionComponent =
   | { kind: "drill"; key: string; weight: number };
 
 export type TemplatePosition = {
+  /** Row id. Needed to edit or delete; the CODE is what prospects store. */
+  id: string;
   code: string;
   label: string;
   /** Board display order. Replaces v1's BOARD_ORDER constant. */

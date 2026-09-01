@@ -1083,6 +1083,159 @@ end
 $$;
 
 -- ============================================================
+-- 13b. TEMPLATE EDITING RPCs (SPEC-V2 section 3.1)
+--
+-- Three things the template editor needs that RLS alone cannot do:
+--
+--   * Replacing a position's weights ATOMICALLY. From the client library
+--     each statement is its own transaction, so a delete-then-insert would
+--     briefly leave the position at zero weight - and the sum-to-100 rule
+--     could not be checked across the pair. Inside one function the
+--     deferred constraint trigger fires once, at the end.
+--
+--   * Deleting an attribute or drill together with the RATINGS and DRILL
+--     RESULTS recorded against it. Those tables key on the text
+--     attribute_key / drill_key, so nothing cascades - and an admin cannot
+--     delete another officer's rating (ratings_delete is own-rows-only, by
+--     design). A security definer function is the only way to clear them,
+--     and it re-checks admin rights itself.
+-- ============================================================
+
+create or replace function public.set_position_weights(
+  p_position uuid,
+  p_components jsonb
+)
+returns void language plpgsql volatile security definer set search_path = public as
+$$
+declare
+  v_org uuid;
+  v_tpl uuid;
+  v_sum int;
+begin
+  select org_id, template_id into v_org, v_tpl
+  from template_positions where id = p_position;
+
+  if v_org is null then raise exception 'position not found'; end if;
+  if not app.is_admin(v_org) then raise exception 'not authorized'; end if;
+
+  delete from position_weights where position_id = p_position;
+
+  -- A component key that does not resolve leaves BOTH ids null, which the
+  -- num_nonnulls CHECK rejects - so a typo fails loudly instead of silently
+  -- dropping a weighted input out of every rating at this position.
+  insert into position_weights
+    (template_id, org_id, position_id, attribute_id, drill_id, weight)
+  select
+    v_tpl,
+    v_org,
+    p_position,
+    case when c->>'kind' = 'attribute'
+         then (select id from template_attributes
+               where template_id = v_tpl and key = c->>'key') end,
+    case when c->>'kind' = 'drill'
+         then (select id from template_drills
+               where template_id = v_tpl and key = c->>'key') end,
+    (c->>'weight')::int
+  from jsonb_array_elements(p_components) c;
+
+  select coalesce(sum(weight), 0) into v_sum
+  from position_weights where position_id = p_position;
+
+  if v_sum <> 100 then
+    raise exception 'weights must sum to 100, got %', v_sum;
+  end if;
+end
+$$;
+
+create or replace function public.delete_template_attribute(p_attribute uuid)
+returns void language plpgsql volatile security definer set search_path = public as
+$$
+declare
+  v_org uuid;
+  v_tpl uuid;
+  v_key text;
+begin
+  select org_id, template_id, key into v_org, v_tpl, v_key
+  from template_attributes where id = p_attribute;
+
+  if v_org is null then raise exception 'attribute not found'; end if;
+  if not app.is_admin(v_org) then raise exception 'not authorized'; end if;
+
+  -- Must be unweighted everywhere FIRST. Deleting it here would cascade its
+  -- position_weights rows, and the sum-to-100 trigger would then reject the
+  -- whole transaction - so this would fail with a confusing weights error
+  -- instead of a clear one. Making the admin remove it from each position
+  -- deliberately is also the only way they consciously choose the weight
+  -- that replaces it, rather than having the rating silently re-scale.
+  if exists (select 1 from position_weights where attribute_id = p_attribute) then
+    raise exception 'still weighted by % position(s)',
+      (select count(*) from position_weights where attribute_id = p_attribute);
+  end if;
+
+  -- Ratings key on text, so nothing cascades. Leaving them would keep
+  -- feeding a median for an attribute the template no longer has.
+  delete from ratings r
+  using prospects p, tryouts t
+  where r.prospect_id = p.id
+    and p.tryout_id = t.id
+    and t.template_id = v_tpl
+    and r.attribute_key = v_key;
+
+  delete from template_attributes where id = p_attribute;
+end
+$$;
+
+create or replace function public.delete_template_drill(p_drill uuid)
+returns void language plpgsql volatile security definer set search_path = public as
+$$
+declare
+  v_org uuid;
+  v_tpl uuid;
+  v_key text;
+begin
+  select org_id, template_id, key into v_org, v_tpl, v_key
+  from template_drills where id = p_drill;
+
+  if v_org is null then raise exception 'drill not found'; end if;
+  if not app.is_admin(v_org) then raise exception 'not authorized'; end if;
+
+  -- Unweighted first, for the same reason as delete_template_attribute.
+  if exists (select 1 from position_weights where drill_id = p_drill) then
+    raise exception 'still weighted by % position(s)',
+      (select count(*) from position_weights where drill_id = p_drill);
+  end if;
+
+  delete from drill_results d
+  using prospects p, tryouts t
+  where d.prospect_id = p.id
+    and p.tryout_id = t.id
+    and t.template_id = v_tpl
+    and d.drill_key = v_key;
+
+  delete from template_drills where id = p_drill;
+end
+$$;
+
+/*
+ * How many ratings / results a component deletion would take with it, so
+ * the editor can warn with a real number instead of a vague caution.
+ */
+create or replace function public.component_usage(p_template uuid, p_key text)
+returns TABLE (rating_count bigint, drill_count bigint)
+language sql stable security definer set search_path = public as
+$$
+  select
+    (select count(*) from ratings r
+      join prospects p on p.id = r.prospect_id
+      join tryouts t on t.id = p.tryout_id
+     where t.template_id = p_template and r.attribute_key = p_key),
+    (select count(*) from drill_results d
+      join prospects p on p.id = d.prospect_id
+      join tryouts t on t.id = p.tryout_id
+     where t.template_id = p_template and d.drill_key = p_key)
+$$;
+
+-- ============================================================
 -- 14. GRANTS
 -- app helpers run inside policies as the querying user, so
 -- authenticated needs EXECUTE. Everything is revoked from anon.
@@ -1107,6 +1260,10 @@ revoke all on function public.set_member_role(uuid, uuid, text)   from public, a
 revoke all on function public.transfer_ownership(uuid, uuid)      from public, anon;
 revoke all on function public.remove_member(uuid, uuid)           from public, anon;
 revoke all on function public.delete_org(uuid)                    from public, anon;
+revoke all on function public.set_position_weights(uuid, jsonb)   from public, anon;
+revoke all on function public.delete_template_attribute(uuid)     from public, anon;
+revoke all on function public.delete_template_drill(uuid)         from public, anon;
+revoke all on function public.component_usage(uuid, text)         from public, anon;
 grant execute on function
   public.create_org(text, text),
   public.join_org(text),
@@ -1114,7 +1271,11 @@ grant execute on function
   public.set_member_role(uuid, uuid, text),
   public.transfer_ownership(uuid, uuid),
   public.remove_member(uuid, uuid),
-  public.delete_org(uuid)
+  public.delete_org(uuid),
+  public.set_position_weights(uuid, jsonb),
+  public.delete_template_attribute(uuid),
+  public.delete_template_drill(uuid),
+  public.component_usage(uuid, text)
 to authenticated;
 
 commit;
