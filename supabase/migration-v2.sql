@@ -1235,6 +1235,30 @@ $$
      where t.template_id = p_template and d.drill_key = p_key)
 $$;
 
+/*
+ * AI usage counters for the rate limiter (SPEC-V2 section 6.5).
+ *
+ * security definer on purpose, and it is REQUIRED rather than an
+ * optimization: ai_usage SELECT is admin-only, so an evaluator
+ * counting their own calls through RLS would always read zero and
+ * the per-user cap would never fire. The global figure cannot be
+ * read through RLS by anyone, since it spans orgs.
+ *
+ * Returns only two integers about the caller's own day and the
+ * system total - no rows, no other user's activity.
+ */
+create or replace function public.ai_usage_today()
+returns TABLE (mine bigint, total bigint)
+language sql stable security definer set search_path = public as
+$$
+  select
+    (select count(*) from ai_usage
+      where user_id = auth.uid()
+        and created_at >= date_trunc('day', now() at time zone 'utc')),
+    (select count(*) from ai_usage
+      where created_at >= date_trunc('day', now() at time zone 'utc'))
+$$;
+
 -- ============================================================
 -- 14. GRANTS
 -- app helpers run inside policies as the querying user, so
@@ -1264,6 +1288,7 @@ revoke all on function public.set_position_weights(uuid, jsonb)   from public, a
 revoke all on function public.delete_template_attribute(uuid)     from public, anon;
 revoke all on function public.delete_template_drill(uuid)         from public, anon;
 revoke all on function public.component_usage(uuid, text)         from public, anon;
+revoke all on function public.ai_usage_today()                     from public, anon;
 grant execute on function
   public.create_org(text, text),
   public.join_org(text),
@@ -1275,7 +1300,8 @@ grant execute on function
   public.set_position_weights(uuid, jsonb),
   public.delete_template_attribute(uuid),
   public.delete_template_drill(uuid),
-  public.component_usage(uuid, text)
+  public.component_usage(uuid, text),
+  public.ai_usage_today()
 to authenticated;
 
 commit;

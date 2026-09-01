@@ -122,7 +122,11 @@ export default async function AccountPage() {
         <>
           {template && (
             <div className="mt-4">
-              <CsvImport takenJerseys={takenJerseys} template={template} />
+              <CsvImport
+                takenJerseys={takenJerseys}
+                template={template}
+                orgId={activeOrg.orgId}
+              />
             </div>
           )}
           <DeleteAllProspects prospectCount={takenJerseys.length} />

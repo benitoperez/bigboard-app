@@ -13,6 +13,7 @@ import { DrillEntry } from "./drill-entry";
 import { SelectToggle } from "@/components/select-toggle";
 import { Comments } from "./comments";
 import { HeadshotUpload } from "./headshot-upload";
+import { ScoutingSummary } from "./scouting-summary";
 import { DeleteProspect } from "./delete-prospect";
 
 export default async function ProspectPage({
@@ -21,7 +22,7 @@ export default async function ProspectPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { profile, is_admin, is_evaluator } = await requireOrg();
+  const { profile, is_admin, is_evaluator, activeOrg } = await requireOrg();
 
   const detail = await getProspectDetail(id, profile!.id);
   if (!detail) notFound();
@@ -212,6 +213,11 @@ export default async function ProspectPage({
 
       {/* ---- Measured drills (SPEC.md section 10.3) ---- */}
       {is_evaluator && <DrillEntry prospectId={p.id} drills={p.drills} />}
+
+      {/* ---- AI scouting summary (SPEC-V2 section 6.4) ---- */}
+      {is_evaluator && activeOrg && (
+        <ScoutingSummary prospectId={p.id} orgId={activeOrg.orgId} />
+      )}
 
       {/* ---- Comments (SPEC.md section 10.3) ---- */}
       <div>

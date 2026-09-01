@@ -21,7 +21,16 @@ const ROOT = resolve(import.meta.dirname, "..");
 const SCAN = ["app", "components", "lib"];
 
 /** Modules that reach the server at runtime. */
-const SERVER_MARKERS = ["next/headers", "@/lib/supabase/server"];
+const SERVER_MARKERS = ["next/headers", "@/lib/supabase/server", "server-only"];
+
+/**
+ * The Gemini key is the project's only true secret (SPEC-V2 section 6.1).
+ * Every other credential is an anon key that RLS is designed to expose, so
+ * this one gets its own check: it may be read in server code and named in
+ * env docs, and nowhere else. A NEXT_PUBLIC prefix on it would put it in
+ * the browser bundle silently.
+ */
+const SECRET_ENV = "GEMINI_API_KEY";
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -92,6 +101,11 @@ function reachesServer(file: string, seen = new Set<string>()): boolean {
 
 const problems: string[] = [];
 
+/** Repo-relative path for readable output. */
+function rel(file: string): string {
+  return file.replace(ROOT + "\\", "").replace(ROOT + "/", "");
+}
+
 for (const [file, text] of source) {
   if (!/^\s*["']use client["']/m.test(text)) continue;
 
@@ -130,6 +144,31 @@ for (const [file, text] of source) {
       `${file.replace(ROOT + "\\", "").replace(ROOT + "/", "")}\n` +
         `        imports a VALUE from "${spec}", which reaches the server.\n` +
         `        Split the client-safe constants/types into their own module.`,
+    );
+  }
+}
+
+// --- the Gemini secret must never reach the browser --------------------
+for (const [file, text] of source) {
+  if (!text.includes(SECRET_ENV)) continue;
+
+  if (text.includes(`NEXT_PUBLIC_${SECRET_ENV}`)) {
+    problems.push(
+      `${rel(file)}
+` +
+        `        names NEXT_PUBLIC_${SECRET_ENV}. That prefix ships the value
+` +
+        `        in the browser bundle. The key is server-side only.`,
+    );
+  }
+
+  if (/^\s*["']use client["']/m.test(text)) {
+    problems.push(
+      `${rel(file)}
+` +
+        `        is a client component naming ${SECRET_ENV}.
+` +
+        `        The browser must only call this app's own /api/ai routes.`,
     );
   }
 }

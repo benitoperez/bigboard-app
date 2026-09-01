@@ -9,13 +9,33 @@ import {
   type RowError,
 } from "@/lib/csv/roster";
 import type { Template } from "@/lib/template";
+import { CsvCleanup, type CleanedSheet } from "./csv-cleanup";
 import { importRoster, type ImportResult } from "./actions";
 
 type Phase =
   | { kind: "idle" }
   | { kind: "parsing" }
-  | { kind: "errors"; errors: RowError[]; fileName: string }
-  | { kind: "ready"; records: Record<string, unknown>[]; headers: string[]; count: number; skippedBlank: number; fileName: string }
+  | {
+      kind: "errors";
+      errors: RowError[];
+      fileName: string;
+      /** Kept so AI cleanup can be offered on a file that failed validation. */
+      csvText?: string;
+      records?: Record<string, unknown>[];
+      headers?: string[];
+    }
+  | {
+      kind: "ready";
+      records: Record<string, unknown>[];
+      headers: string[];
+      count: number;
+      skippedBlank: number;
+      fileName: string;
+      csvText: string;
+      /** The parse as it came off disk, for the cleanup diff. */
+      originalRecords: Record<string, unknown>[];
+      originalHeaders: string[];
+    }
   | {
       kind: "done";
       inserted: number;
@@ -27,8 +47,10 @@ type Phase =
 export function CsvImport({
   takenJerseys,
   template,
+  orgId,
 }: {
   takenJerseys: number[];
+  orgId: string;
   /**
    * The tryout's template. Validation runs here in the browser for instant
    * feedback and AGAIN on the server, which re-reads the template rather
@@ -45,42 +67,83 @@ export function CsvImport({
     if (fileInput.current) fileInput.current.value = "";
   }
 
+  /**
+   * Validate a parsed sheet and move to the matching phase.
+   *
+   * Shared by the initial file read and by accepting an AI proposal, so an
+   * AI-cleaned sheet goes through exactly the same validation an untouched
+   * one does. That equivalence is the point: the AI is a pre-processor, not
+   * an authority.
+   */
+  function validateAndSet(
+    records: Record<string, unknown>[],
+    headers: string[],
+    fileName: string,
+    csvText: string,
+    original: { records: Record<string, unknown>[]; headers: string[] },
+  ) {
+    const result = validateRoster(records, headers, new Set(takenJerseys), template);
+
+    if (!result.ok) {
+      setPhase({
+        kind: "errors",
+        errors: result.errors,
+        fileName,
+        csvText,
+        records: original.records,
+        headers: original.headers,
+      });
+      return;
+    }
+
+    setPhase({
+      kind: "ready",
+      records,
+      headers,
+      count: result.rows.length,
+      skippedBlank: result.skippedBlank,
+      fileName,
+      csvText,
+      originalRecords: original.records,
+      originalHeaders: original.headers,
+    });
+  }
+
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setPhase({ kind: "parsing" });
 
-    Papa.parse<Record<string, unknown>>(file, {
-      header: true,
-      skipEmptyLines: false, // blank rows are counted, not silently dropped
-      complete: (parsed) => {
-        const headers = parsed.meta.fields ?? [];
-        const result = validateRoster(
-          parsed.data,
-          headers,
-          new Set(takenJerseys),
-          template,
-        );
-        if (!result.ok) {
-          setPhase({ kind: "errors", errors: result.errors, fileName: file.name });
-          return;
-        }
-        setPhase({
-          kind: "ready",
-          records: parsed.data,
-          headers,
-          count: result.rows.length,
-          skippedBlank: result.skippedBlank,
-          fileName: file.name,
+    // The raw text is kept alongside the parse: AI cleanup works on the
+    // sheet as written, including the header row papaparse consumed.
+    file
+      .text()
+      .then((csvText) => {
+        Papa.parse<Record<string, unknown>>(csvText, {
+          header: true,
+          skipEmptyLines: false, // blank rows are counted, not silently dropped
+          complete: (parsed) => {
+            const headers = parsed.meta.fields ?? [];
+            validateAndSet(parsed.data, headers, file.name, csvText, {
+              records: parsed.data,
+              headers,
+            });
+          },
+          error: (err: Error) =>
+            setPhase({
+              kind: "errors",
+              errors: [{ line: 0, message: `Could not read the file: ${err.message}` }],
+              fileName: file.name,
+            }),
         });
-      },
-      error: (err) =>
+      })
+      .catch(() =>
         setPhase({
           kind: "errors",
-          errors: [{ line: 0, message: `Could not read the file: ${err.message}` }],
+          errors: [{ line: 0, message: "Could not read that file." }],
           fileName: file.name,
         }),
-    });
+      );
   }
 
   function confirmImport() {
@@ -101,6 +164,18 @@ export function CsvImport({
         setPhase({ kind: "errors", errors: res.errors, fileName: "" });
       }
     });
+  }
+
+  function acceptCleanup(sheet: CleanedSheet) {
+    if (phase.kind !== "ready" && phase.kind !== "errors") return;
+    const fileName = phase.fileName;
+    const csvText = phase.kind === "ready" ? phase.csvText : (phase.csvText ?? "");
+    const original =
+      phase.kind === "ready"
+        ? { records: phase.originalRecords, headers: phase.originalHeaders }
+        : { records: phase.records ?? [], headers: phase.headers ?? [] };
+
+    validateAndSet(sheet.rows, sheet.headers, fileName, csvText, original);
   }
 
   return (
@@ -174,6 +249,19 @@ export function CsvImport({
               </li>
             )}
           </ul>
+          {/* A file that failed validation is the case AI cleanup exists
+              for, so it is offered right here rather than only up front. */}
+          {phase.csvText && (
+            <CsvCleanup
+              csvText={phase.csvText}
+              originalHeaders={phase.headers ?? []}
+              originalRows={phase.records ?? []}
+              orgId={orgId}
+              onAccept={acceptCleanup}
+              disabled={pending}
+            />
+          )}
+
           <button
             type="button"
             onClick={reset}
@@ -217,6 +305,15 @@ export function CsvImport({
               Cancel
             </button>
           </div>
+
+          <CsvCleanup
+            csvText={phase.csvText}
+            originalHeaders={phase.originalHeaders}
+            originalRows={phase.originalRecords}
+            orgId={orgId}
+            onAccept={acceptCleanup}
+            disabled={pending}
+          />
         </div>
       )}
 
