@@ -27,11 +27,14 @@ export function HeadshotUpload({
   tryoutId,
   hasHeadshot,
   currentPath,
+  orgId,
 }: {
   prospectId: string;
   tryoutId: string;
   hasHeadshot: boolean;
   currentPath: string | null;
+  /** First path segment. Storage policies authorize on it. */
+  orgId: string;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -55,7 +58,7 @@ export function HeadshotUpload({
         `Uploading ${formatBytes(prepared.blob.size)} (was ${formatBytes(prepared.originalBytes)})...`,
       );
 
-      const path = headshotPath(tryoutId, prospectId);
+      const path = headshotPath(orgId, tryoutId, prospectId);
       const supabase = createClient();
       const { error: upErr } = await supabase.storage
         .from("headshots")

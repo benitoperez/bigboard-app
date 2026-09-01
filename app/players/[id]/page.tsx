@@ -139,6 +139,7 @@ export default async function ProspectPage({
             tryoutId={tryout.id}
             hasHeadshot={p.headshotPath !== null}
             currentPath={p.headshotPath}
+            orgId={activeOrg!.orgId}
           />
         )}
 

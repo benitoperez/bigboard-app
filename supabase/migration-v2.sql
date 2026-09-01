@@ -641,15 +641,25 @@ create trigger set_org before insert on comments      for each row execute funct
 alter table drill_results drop constraint if exists drill_results_value_check;
 alter table drill_results add constraint drill_results_value_check check (value > 0);
 
--- Storage paths become {org_id}/... (B21). All existing objects
--- belong to the default org.
+-- Storage paths gain an {org_id}/ prefix (B21), because the storage
+-- policies below authorize on the FIRST path segment. All existing
+-- objects belong to the default org.
+--
+-- v1 paths are already {tryout_id}/{prospect_id}.jpg, so they contain
+-- a slash - the guard is "does not already start with this org id",
+-- NOT "has no slash". Getting that wrong leaves the tryout id in
+-- segment one, which is a perfectly valid uuid that is not an org id,
+-- so app.is_member() returns false and every headshot silently stops
+-- loading with no error anywhere.
 update storage.objects
 set name = '11111111-1111-4111-8111-111111111111/' || name
-where bucket_id = 'headshots' and position('/' in name) = 0;
+where bucket_id = 'headshots'
+  and name not like '11111111-1111-4111-8111-111111111111/%';
 
 update prospects
 set headshot_url = '11111111-1111-4111-8111-111111111111/' || headshot_url
-where headshot_url is not null and position('/' in headshot_url) = 0;
+where headshot_url is not null
+  and headshot_url not like '11111111-1111-4111-8111-111111111111/%';
 
 -- ============================================================
 -- 11. VIEWS (SPEC-V2 §3.2, B9)

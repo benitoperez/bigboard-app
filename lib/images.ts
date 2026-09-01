@@ -88,6 +88,14 @@ export function formatBytes(n: number): string {
 }
 
 /** Deterministic path, so replacing a headshot overwrites rather than piles up. */
-export function headshotPath(tryoutId: string, prospectId: string): string {
-  return `${tryoutId}/${prospectId}.jpg`;
+export function headshotPath(
+  orgId: string,
+  tryoutId: string,
+  prospectId: string,
+): string {
+  // The ORG id must be the first segment: the storage policies authorize by
+  // parsing it out of the path (SPEC-V2 section 2.4). Putting anything else
+  // first leaves the object unreadable, and because a tryout id is also a
+  // valid uuid it fails silently rather than erroring.
+  return `${orgId}/${tryoutId}/${prospectId}.jpg`;
 }
