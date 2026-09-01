@@ -3,19 +3,41 @@ import { createClient } from "@/lib/supabase/server";
 import { requireOrg } from "@/lib/auth";
 import { ROLE_BLURBS, ROLE_LABELS } from "@/lib/org";
 import { getActiveTryout, getTryoutsWithCounts } from "@/lib/data/tryouts";
+import { getInviteCodes, getMembers } from "@/lib/data/org";
+import { getTemplateForTryout } from "@/lib/data/template";
 import { signOut } from "@/app/login/actions";
 import { CsvImport } from "./csv-import";
 import { DeleteAllProspects } from "./delete-all";
 import { TryoutManager } from "./tryout-manager";
-import { getTemplateForTryout } from "@/lib/data/template";
+import { MembersPanel } from "./members-panel";
+import { InviteCodes } from "./invite-codes";
+import { DeleteOrgPanel, OrgPanel } from "./org-panel";
 
 export const metadata: Metadata = { title: "Account - Big Board" };
 
+/**
+ * ONE Account screen, rendered by role — SPEC-V2.md section 5.
+ *
+ * Not separate screens per role and no route branching: the same page, with
+ * sections that appear as the caller's role allows. Hiding a section is
+ * cosmetic; RLS and the RPCs are what actually enforce any of this, which is
+ * why every action re-checks rather than trusting that the button was only
+ * rendered for the right people.
+ */
 export default async function AccountPage() {
-  const { profile, email, is_admin, activeOrg, role } = await requireOrg();
-  const [tryout, tryouts] = await Promise.all([
+  const { profile, email, userId, role, is_admin, activeOrg, memberships } =
+    await requireOrg();
+
+  // requireOrg guarantees both; narrowing for the type checker.
+  if (!activeOrg || !role || !userId) return null;
+
+  const [tryout, tryouts, members, inviteCodes] = await Promise.all([
     getActiveTryout(),
     getTryoutsWithCounts(),
+    getMembers(activeOrg.orgId),
+    // Returns empty below admin — the RLS policy on invite_codes decides,
+    // not this call site.
+    getInviteCodes(activeOrg.orgId),
   ]);
 
   const supabase = await createClient();
@@ -33,14 +55,15 @@ export default async function AccountPage() {
   }
 
   return (
-    <main className="safe-top px-6 py-8">
+    <main className="safe-top safe-bottom px-6 py-8">
       <header>
-        <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
-          {activeOrg?.orgName ?? "Profile"}
+        <p className="truncate text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
+          {activeOrg.orgName}
         </p>
         <h1 className="mt-1 text-4xl tracking-tight uppercase">Account</h1>
       </header>
 
+      {/* ---- Everyone: profile ---- */}
       <section className="mt-6 rounded-lg border border-border bg-card p-4">
         <p className="text-lg font-semibold text-foreground">
           {profile?.display_name ?? "Unknown"}
@@ -50,19 +73,29 @@ export default async function AccountPage() {
         {/* The role is shown to everyone, not just admins: knowing why a
             control is missing is the difference between "read-only" and
             "broken". */}
-        {role && (
-          <span className="mt-3 inline-block rounded-full bg-primary/15 px-3 py-1 text-xs font-bold tracking-wide text-primary uppercase">
-            {ROLE_LABELS[role]}
-          </span>
-        )}
-        {role && (
-          <p className="mt-2 text-xs text-muted-foreground">{ROLE_BLURBS[role]}</p>
-        )}
+        <span className="mt-3 inline-block rounded-full bg-primary/15 px-3 py-1 text-xs font-bold tracking-wide text-primary uppercase">
+          {ROLE_LABELS[role]}
+        </span>
+        <p className="mt-2 text-xs text-muted-foreground">{ROLE_BLURBS[role]}</p>
       </section>
 
+      {/* ---- Everyone: org name, switcher, leave. Rename is admin+. ---- */}
+      <OrgPanel
+        activeOrg={activeOrg}
+        memberships={memberships}
+        role={role}
+        isAdmin={is_admin}
+      />
+
+      {/* ---- Everyone reads the roster; admin+ gets the controls ---- */}
+      <MembersPanel members={members} myRole={role} myUserId={userId} />
+
+      {/* ---- Admin+: invite codes ---- */}
+      {is_admin && inviteCodes.length > 0 && <InviteCodes codes={inviteCodes} />}
+
+      {/* ---- Admin+: tryout classes, import, destructive data controls ---- */}
       <TryoutManager tryouts={tryouts} isAdmin={is_admin} />
 
-      {/* SPEC.md section 12: admin only. The server action re-checks this. */}
       {is_admin && (
         <>
           {template && (
@@ -73,6 +106,9 @@ export default async function AccountPage() {
           <DeleteAllProspects prospectCount={takenJerseys.length} />
         </>
       )}
+
+      {/* ---- Owner only: delete the org ---- */}
+      {role === "owner" && <DeleteOrgPanel orgName={activeOrg.orgName} />}
 
       <form action={signOut} className="mt-8">
         <button

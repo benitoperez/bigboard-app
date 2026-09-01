@@ -8,7 +8,7 @@ import {
   yearOptions,
   type TryoutWithCount,
 } from "@/lib/tryouts";
-import { createTryout, setActiveTryout } from "./tryout-actions";
+import { createTryout, renameTryout, setActiveTryout } from "./tryout-actions";
 
 /**
  * Tryout class picker and creator. Admin only.
@@ -29,6 +29,8 @@ export function TryoutManager({
   const active = tryouts.find((t) => t.isActive) ?? null;
 
   const [creating, setCreating] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [newName, setNewName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -41,6 +43,20 @@ export function TryoutManager({
         setError(res.error);
         return;
       }
+      router.refresh();
+    });
+  }
+
+  function rename() {
+    if (!active) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await renameTryout(active.id, newName);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setRenaming(false);
       router.refresh();
     });
   }
@@ -108,6 +124,61 @@ export function TryoutManager({
               {error}
             </p>
           )}
+
+          {/* Rename, new in v2. `tryouts` has no DELETE policy on purpose -
+              a class is the historical record - so without this a typo in a
+              class name was permanent. */}
+          {active &&
+            (renaming ? (
+              <div className="mt-3 flex flex-col gap-2">
+                <label htmlFor="rename-tryout" className="text-xs text-muted-foreground">
+                  Rename &ldquo;{active.name}&rdquo;
+                </label>
+                <input
+                  id="rename-tryout"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  maxLength={60}
+                  disabled={pending}
+                  className="min-h-tap rounded-md border border-border bg-input px-3 text-base
+                             text-foreground outline-none focus-visible:border-primary
+                             disabled:opacity-50"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={rename}
+                    disabled={pending || !newName.trim()}
+                    className="min-h-tap rounded-md bg-primary px-4 text-sm font-bold
+                               text-primary-foreground disabled:opacity-40"
+                  >
+                    {pending ? "Saving..." : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRenaming(false)}
+                    disabled={pending}
+                    className="min-h-tap rounded-md border border-border px-4 text-sm
+                               font-semibold text-muted-foreground disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setNewName(active.name);
+                  setRenaming(true);
+                  setError(null);
+                }}
+                disabled={pending}
+                className="min-h-tap mt-2 text-xs font-semibold text-muted-foreground"
+              >
+                Rename this class
+              </button>
+            ))}
 
           {creating ? (
             <CreateForm

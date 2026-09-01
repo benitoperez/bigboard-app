@@ -121,3 +121,42 @@ function revalidateEverything() {
   revalidatePath("/selected");
   revalidatePath("/account");
 }
+
+/**
+ * Rename a tryout class — new in v2 (SPEC-V2.md sections 2.5 and 5).
+ *
+ * v1 had no rename UI, and `tryouts` deliberately has no DELETE policy
+ * because a class is the historical record — so a class created with a typo
+ * was permanent. The admin UPDATE policy always allowed this; only the UI
+ * was missing.
+ *
+ * Renaming touches nothing but the label. Every athlete, rating, drill
+ * result, selection and comment hangs off tryout_id and is unaffected.
+ */
+export async function renameTryout(
+  tryoutId: string,
+  name: string,
+): Promise<SwitchResult> {
+  const { profile, is_admin } = await getOfficer();
+  if (!profile) return { ok: false, error: "Not signed in." };
+  if (!is_admin) {
+    return { ok: false, error: "Only an admin can rename a tryout class." };
+  }
+
+  const trimmed = name.trim();
+  if (!trimmed) return { ok: false, error: "Give the class a name." };
+  if (trimmed.length > NAME_MAX) {
+    return { ok: false, error: `Keep the name under ${NAME_MAX} characters.` };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tryouts")
+    .update({ name: trimmed })
+    .eq("id", tryoutId);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
