@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getOfficer } from "@/lib/auth";
 import { validateRoster, type RowError } from "@/lib/csv/roster";
+import { getTemplateForTryout } from "@/lib/data/template";
 
 export type ImportResult =
   | {
@@ -69,7 +70,15 @@ export async function importRoster(
 
   const takenJerseys = new Set((existing ?? []).map((p) => p.jersey_number));
 
-  const result = validateRoster(records, headers, takenJerseys);
+  const template = await getTemplateForTryout(tryout.id);
+  if (!template) {
+    return {
+      ok: false,
+      errors: [{ line: 0, message: "This tryout has no evaluation template." }],
+    };
+  }
+
+  const result = validateRoster(records, headers, takenJerseys, template);
   if (!result.ok) return { ok: false, errors: result.errors };
 
   // One statement, so Postgres makes it atomic. The unique constraint on
@@ -105,7 +114,7 @@ export async function importRoster(
     };
   }
 
-  // --- optional 40 times -------------------------------------------------
+  // --- optional drill results --------------------------------------------
   // Prospects and drill_results cannot share one statement, so the two
   // inserts cannot be one transaction from here. If the times fail, the
   // prospects just inserted are removed again, which restores the state the
@@ -113,22 +122,25 @@ export async function importRoster(
   // imported but silently missing the times the file carried - exactly the
   // half-done outcome section 12 exists to prevent.
   const idByJersey = new Map((inserted ?? []).map((p) => [p.jersey_number, p.id]));
-  const drillRows = result.rows.flatMap((r) =>
-    ([1, 2] as const).flatMap((attempt) => {
-      const value = attempt === 1 ? r.forty_1 : r.forty_2;
-      const prospectId = idByJersey.get(r.jersey_number);
-      if (value === null || !prospectId) return [];
-      return [
-        {
-          prospect_id: prospectId,
-          drill_key: "forty",
-          attempt_number: attempt,
-          value,
-          recorded_by: officer.id,
-        },
-      ];
-    }),
-  );
+  const drillRows = result.rows.flatMap((r) => {
+    const prospectId = idByJersey.get(r.jersey_number);
+    if (!prospectId) return [];
+    return Object.entries(r.drills).flatMap(([drillKey, attempts]) =>
+      attempts.flatMap((value, i) =>
+        value === null
+          ? []
+          : [
+              {
+                prospect_id: prospectId,
+                drill_key: drillKey,
+                attempt_number: i + 1,
+                value,
+                recorded_by: officer.id,
+              },
+            ],
+      ),
+    );
+  });
 
   const selectionRows = result.rows.flatMap((r) => {
     const prospectId = idByJersey.get(r.jersey_number);

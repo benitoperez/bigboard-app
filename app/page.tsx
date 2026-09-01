@@ -4,7 +4,13 @@ import { signOut } from "@/app/login/actions";
 import { getProspects, type ProspectRow } from "@/lib/data/prospects";
 import { getActiveTryout } from "@/lib/data/tryouts";
 import { tryoutPeriod } from "@/lib/tryouts";
-import { BOARD_ORDER, POSITIONS, type PositionKey } from "@/lib/config/positions";
+import {
+  boardOrder,
+  formatDrillValue,
+  getDrill,
+  type Template,
+  type TemplatePosition,
+} from "@/lib/template";
 import { Avatar } from "@/components/avatar";
 import { Dial } from "@/components/dial";
 import { compareForBoard } from "@/lib/ratings";
@@ -53,7 +59,21 @@ export default async function HomePage() {
     );
   }
 
-  const prospects = await getProspects(tryout.id);
+  const { template, prospects } = await getProspects(tryout.id);
+
+  // No readable template means the tryout points at config this account
+  // cannot see - a wrong-org id, or a deleted template. Either way the
+  // ratings would be meaningless rather than merely absent.
+  if (!template) {
+    return (
+      <main className="safe-top px-6 py-8">
+        <h1 className="text-4xl tracking-tight uppercase">Big Board</h1>
+        <p className="mt-6 text-sm text-muted-foreground">
+          This tryout has no evaluation template.
+        </p>
+      </main>
+    );
+  }
 
   return (
     <main className="safe-top px-6 py-8">
@@ -67,7 +87,7 @@ export default async function HomePage() {
         <h1 className="mt-1 text-4xl tracking-tight uppercase">Big Board</h1>
       </header>
 
-      <KpiStrip prospects={prospects} />
+      <KpiStrip template={template} prospects={prospects} />
 
       {prospects.length === 0 ? (
         <p className="mt-8 text-sm text-muted-foreground">
@@ -75,10 +95,16 @@ export default async function HomePage() {
         </p>
       ) : (
         <div className="mt-6 space-y-6">
-          {/* SPEC.md section 10.1: boards render in BOARD_ORDER, so priority
-              positions reorder from config without touching this file. */}
-          {BOARD_ORDER.map((position) => (
-            <Board key={position} position={position} prospects={prospects} />
+          {/* SPEC.md section 10.1: boards render in the template's sort
+              order, so priority positions reorder from the template editor
+              without touching this file. */}
+          {boardOrder(template).map((position) => (
+            <Board
+              key={position.code}
+              template={template}
+              position={position}
+              prospects={prospects}
+            />
           ))}
         </div>
       )}
@@ -87,15 +113,22 @@ export default async function HomePage() {
 }
 
 /**
- * SPEC.md section 10.1: fastest 40 in the class, most-rated prospect, total
- * prospects, total ratings logged.
+ * SPEC.md section 10.1, generalized by SPEC-V2.md: the class leader in each
+ * measured drill, most-rated prospect, total prospects, total ratings.
+ *
+ * "Fastest 40" was hardcoded in v1. A template may now define several drills
+ * pointing in different directions, so the leader is whichever end of the
+ * range that drill calls good - fastest for a 40, hardest for an exit
+ * velocity. Reading `direction` here is what keeps a velocity board from
+ * celebrating the weakest hitter in the class.
  */
-function KpiStrip({ prospects }: { prospects: ProspectRow[] }) {
-  const timed = prospects.filter((p) => p.bestForty !== null);
-  const fastest = timed.length
-    ? timed.reduce((a, b) => (a.bestForty! <= b.bestForty! ? a : b))
-    : null;
-
+function KpiStrip({
+  template,
+  prospects,
+}: {
+  template: Template;
+  prospects: ProspectRow[];
+}) {
   const inputsFor = (p: ProspectRow) =>
     Object.values(p.attributeRatings).reduce(
       (sum, a) => sum + (a?.raterCount ?? 0),
@@ -107,13 +140,42 @@ function KpiStrip({ prospects }: { prospects: ProspectRow[] }) {
     ? prospects.reduce((a, b) => (inputsFor(a) >= inputsFor(b) ? a : b))
     : null;
 
+  const drillLeaders = template.drills.map((drill) => {
+    const measured = prospects.filter((p) => p.drills[drill.key] != null);
+    const leader = measured.length
+      ? measured.reduce((a, b) => {
+          const av = a.drills[drill.key]!.best;
+          const bv = b.drills[drill.key]!.best;
+          return drill.direction === "lower_is_better"
+            ? av <= bv
+              ? a
+              : b
+            : av >= bv
+              ? a
+              : b;
+        })
+      : null;
+
+    return {
+      key: drill.key,
+      label:
+        drill.direction === "lower_is_better"
+          ? `Fastest ${drill.label}`
+          : `Top ${drill.label}`,
+      value: leader
+        ? formatDrillValue(drill, leader.drills[drill.key]!.best)
+        : "--",
+      sub: leader
+        ? `#${leader.jerseyNumber} ${leader.lastName}`
+        : "none measured",
+    };
+  });
+
   return (
     <dl className="mt-4 grid grid-cols-2 gap-2">
-      <Kpi
-        label="Fastest 40"
-        value={fastest ? fastest.bestForty!.toFixed(2) : "--"}
-        sub={fastest ? `#${fastest.jerseyNumber} ${fastest.lastName}` : "none timed"}
-      />
+      {drillLeaders.map((d) => (
+        <Kpi key={d.key} label={d.label} value={d.value} sub={d.sub} />
+      ))}
       <Kpi
         label="Most rated"
         value={mostRated ? String(inputsFor(mostRated)) : "0"}
@@ -152,15 +214,24 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub: string 
  * hidden, so officers can see who still needs eyes on them.
  */
 function Board({
+  template,
   position,
   prospects,
 }: {
-  position: PositionKey;
+  template: Template;
+  position: TemplatePosition;
   prospects: ProspectRow[];
 }) {
+  // The drills this position is actually scored on, so a row shows the
+  // measurements that moved its own number rather than every drill in the
+  // template.
+  const drillKeys = position.components
+    .filter((c) => c.kind === "drill")
+    .map((c) => c.key);
+
   const rows = prospects
-    .filter((p) => p.playedPositions.includes(position))
-    .map((p) => ({ p, r: p.ratingsByPosition[position]! }))
+    .filter((p) => p.playedPositions.includes(position.code))
+    .map((p) => ({ p, r: p.ratingsByPosition[position.code]! }))
     .sort((a, b) =>
       compareForBoard(
         { raw: a.r.raw, jerseyNumber: a.p.jerseyNumber },
@@ -176,7 +247,7 @@ function Board({
     <section>
       <div className="flex items-baseline justify-between">
         <h2 className="text-sm font-bold tracking-wide text-primary uppercase">
-          {POSITIONS[position].label}
+          {position.label}
         </h2>
         <span className="tnum text-xs text-muted-foreground">
           {ranked} of {rows.length} rated
@@ -218,9 +289,17 @@ function Board({
                     {gated
                       ? `${r.covered} of ${r.required} inputs`
                       : `${r.inputs} ${r.inputs === 1 ? "input" : "inputs"}`}
-                    {p.bestForty !== null && (
-                      <> &middot; {p.bestForty.toFixed(2)} forty</>
-                    )}
+                    {drillKeys.map((key) => {
+                      const stat = p.drills[key];
+                      const drill = getDrill(template, key);
+                      if (!stat || !drill) return null;
+                      return (
+                        <span key={key}>
+                          {" "}
+                          &middot; {formatDrillValue(drill, stat.best)}
+                        </span>
+                      );
+                    })}
                   </p>
                 </div>
 

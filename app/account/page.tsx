@@ -6,6 +6,7 @@ import { signOut } from "@/app/login/actions";
 import { CsvImport } from "./csv-import";
 import { DeleteAllProspects } from "./delete-all";
 import { TryoutManager } from "./tryout-manager";
+import { getTemplateForTryout } from "@/lib/data/template";
 
 export const metadata: Metadata = { title: "Account - Big Board" };
 
@@ -24,6 +25,7 @@ export default async function AccountPage() {
   // Jersey numbers already taken, so the CSV validator can flag collisions
   // before the user submits rather than after.
   let takenJerseys: number[] = [];
+  const template = tryout ? await getTemplateForTryout(tryout.id) : null;
   if (tryout) {
     const { data } = await supabase
       .from("prospects")
@@ -58,9 +60,11 @@ export default async function AccountPage() {
       {/* SPEC.md section 12: admin only. The server action re-checks this. */}
       {officer?.is_admin && (
         <>
-          <div className="mt-4">
-            <CsvImport takenJerseys={takenJerseys} />
-          </div>
+          {template && (
+            <div className="mt-4">
+              <CsvImport takenJerseys={takenJerseys} template={template} />
+            </div>
+          )}
           <DeleteAllProspects prospectCount={takenJerseys.length} />
         </>
       )}

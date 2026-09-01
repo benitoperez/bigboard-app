@@ -1,5 +1,3 @@
-import { POSITIONS, type PositionKey } from "@/lib/config/positions";
-
 /**
  * SPEC.md section 13: the default avatar is a colored circle containing the
  * jersey number. Headshots are optional and nothing blocks on one existing.
@@ -56,14 +54,21 @@ export function Avatar({
 
 export function PositionChip({
   position,
+  label,
   muted = false,
 }: {
-  position: PositionKey;
+  /** Position code, e.g. "WR" or "SS". */
+  position: string;
+  /**
+   * Full name for the tooltip. Passed in rather than looked up: positions
+   * live in the org's template now, which only server code can read.
+   */
+  label?: string;
   muted?: boolean;
 }) {
   return (
     <span
-      title={POSITIONS[position].label}
+      title={label ?? position}
       className={
         "rounded-full px-2 py-0.5 text-xs font-bold tracking-wide uppercase " +
         (muted

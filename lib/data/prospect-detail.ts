@@ -1,16 +1,18 @@
 import { createClient } from "@/lib/supabase/server";
 import { signHeadshots } from "@/lib/data/storage";
+import { getTemplateForTryout } from "@/lib/data/template";
 import {
-  ATTRIBUTES,
-  POSITIONS,
-  MIN_TIMED_FOR_PERCENTILE,
-  type AttributeKey,
-  type PositionKey,
-} from "@/lib/config/positions";
+  attributeUnion,
+  drillUnion,
+  isPositionCode,
+  type Template,
+  type TemplateDrill,
+} from "@/lib/template";
 import {
   computePositionRating,
   missingComponents,
   type AttributeRatings,
+  type DrillPercentiles,
   type PositionRating,
 } from "@/lib/ratings";
 
@@ -22,8 +24,9 @@ export type RaterEntry = {
 };
 
 export type AttributeDetail = {
-  key: AttributeKey;
+  key: string;
   label: string;
+  short: string;
   /** Median across officers, 0-10. Null when nobody has rated it. */
   teamRating: number | null;
   raterCount: number;
@@ -32,41 +35,55 @@ export type AttributeDetail = {
   raters: RaterEntry[];
 };
 
+/**
+ * One measured drill on the profile: the template's definition, this
+ * prospect's attempts, and where those land in the class.
+ */
+export type DrillDetail = {
+  drill: TemplateDrill;
+  /** Best attempt: minimum for lower_is_better, maximum otherwise. */
+  best: number | null;
+  avg: number | null;
+  /** Null until enough of the class has done this drill. */
+  percentile: number | null;
+  /** False while the class is below the drill's threshold. */
+  percentileIsValid: boolean;
+  /** How many prospects have a result, for the gating message. */
+  measuredCount: number;
+  /** Individual attempts, up to the drill's maxAttempts. */
+  attempts: { attemptNumber: number; value: number }[];
+};
+
 export type ProspectDetail = {
   id: string;
+  tryoutId: string;
   jerseyNumber: number;
   firstName: string;
   lastName: string;
   fullName: string;
-  primaryPosition: PositionKey;
-  secondaryPositions: PositionKey[];
+  primaryPosition: string;
+  secondaryPositions: string[];
   /** Signed, render-ready URL. Null when there is no headshot. */
   headshotUrl: string | null;
   /** Underlying storage path, for replace/remove. */
   headshotPath: string | null;
   /** Union of attributes across every position this prospect plays. */
   attributes: AttributeDetail[];
+  /** The measured drills that count for the positions this prospect plays. */
+  drills: DrillDetail[];
   /** Rating per position played, primary first. */
-  positionRatings: { position: PositionKey; rating: PositionRating; missing: string[] }[];
-  bestForty: number | null;
-  avgForty: number | null;
-  speedPercentile: number | null;
-  /** False until enough of the class is timed for a percentile to mean anything. */
-  percentileIsValid: boolean;
-  /** How many prospects in this tryout have a 40, for the gating message. */
-  timedCount: number;
-  /** Individual attempts, indexed by attempt number. Max MAX_FORTY_ATTEMPTS. */
-  fortyAttempts: { attemptNumber: number; value: number }[];
+  positionRatings: { position: string; label: string; rating: PositionRating; missing: string[] }[];
 };
 
-function isPositionKey(v: unknown): v is PositionKey {
-  return typeof v === "string" && v in POSITIONS;
-}
+export type ProspectDetailResult = {
+  template: Template;
+  prospect: ProspectDetail;
+};
 
 export async function getProspectDetail(
   prospectId: string,
   officerId: string,
-): Promise<ProspectDetail | null> {
+): Promise<ProspectDetailResult | null> {
   const supabase = await createClient();
 
   const { data: p } = await supabase
@@ -77,49 +94,53 @@ export async function getProspectDetail(
     .eq("id", prospectId)
     .maybeSingle();
 
-  if (!p || !isPositionKey(p.primary_position)) return null;
+  if (!p) return null;
+
+  const template = await getTemplateForTryout(p.tryout_id);
+  if (!template || !isPositionCode(template, p.primary_position)) return null;
 
   const [
     { data: aggRows },
     { data: rawRatings },
-    { data: speed },
+    { data: statRows },
     { data: attemptRows },
   ] = await Promise.all([
-      supabase
-        .from("prospect_attribute_ratings")
-        .select("attribute_key, team_rating, rater_count")
-        .eq("prospect_id", prospectId),
-      // Every officer's individual rating, for the "who rated" dropdown.
-      // SPEC.md section 8: an 8.4 from one officer and an 8.4 from nine are
-      // not the same fact, and the UI must not pretend otherwise.
-      supabase
-        .from("ratings")
-        .select("attribute_key, value, officer_id, officers(display_name)")
-        .eq("prospect_id", prospectId),
-      supabase
-        .from("prospect_speed")
-        .select("best_forty, avg_forty, speed_percentile, timed_count")
-        .eq("prospect_id", prospectId)
-        .maybeSingle(),
-      supabase
-        .from("drill_results")
-        .select("attempt_number, value")
-        .eq("prospect_id", prospectId)
-        .eq("drill_key", "forty")
-        .order("attempt_number", { ascending: true }),
-    ]);
+    supabase
+      .from("prospect_attribute_ratings")
+      .select("attribute_key, team_rating, rater_count")
+      .eq("prospect_id", prospectId),
+    // Every officer's individual rating, for the "who rated" dropdown.
+    // SPEC.md section 8: an 8.4 from one officer and an 8.4 from nine are
+    // not the same fact, and the UI must not pretend otherwise.
+    supabase
+      .from("ratings")
+      .select("attribute_key, value, officer_id, profiles(display_name)")
+      .eq("prospect_id", prospectId),
+    // One row per drill this prospect has attempted.
+    supabase
+      .from("prospect_drill_stats")
+      .select("drill_key, best, avg_value, percentile, measured_count")
+      .eq("prospect_id", prospectId),
+    // Every attempt across every drill, in one query rather than one per
+    // drill - a template may define several.
+    supabase
+      .from("drill_results")
+      .select("drill_key, attempt_number, value")
+      .eq("prospect_id", prospectId)
+      .order("attempt_number", { ascending: true }),
+  ]);
 
-  const secondaryPositions = (p.secondary_positions ?? []).filter(isPositionKey);
-  const playedPositions: PositionKey[] = [p.primary_position, ...secondaryPositions];
+  const secondaryPositions = (p.secondary_positions ?? []).filter(
+    (s: unknown): s is string => isPositionCode(template, s),
+  );
+  const playedPositions = [p.primary_position, ...secondaryPositions];
 
   // Union of attributes across all positions played. Shared attributes like
   // quickness appear once and count toward every position that uses them.
-  const attrKeys: AttributeKey[] = [];
-  for (const pos of playedPositions) {
-    for (const a of POSITIONS[pos].attributes) {
-      if (!attrKeys.includes(a)) attrKeys.push(a);
-    }
-  }
+  // This is also what covers baseball two-way players: P plus a field
+  // position simply unions to both component sets, no new mechanics.
+  const unionAttributes = attributeUnion(template, playedPositions);
+  const unionDrills = drillUnion(template, playedPositions);
 
   const agg = new Map(
     (aggRows ?? []).map((r) => [
@@ -131,7 +152,7 @@ export async function getProspectDetail(
   const ratersByAttr = new Map<string, RaterEntry[]>();
   const myRatings = new Map<string, number>();
   for (const r of rawRatings ?? []) {
-    const officer = r.officers as unknown as { display_name: string } | null;
+    const officer = r.profiles as unknown as { display_name: string } | null;
     const list = ratersByAttr.get(r.attribute_key) ?? [];
     list.push({
       officerId: r.officer_id,
@@ -144,26 +165,49 @@ export async function getProspectDetail(
     }
   }
 
-  const attributes: AttributeDetail[] = attrKeys.map((key) => {
-    const a = agg.get(key);
+  const attributes: AttributeDetail[] = unionAttributes.map((a) => {
+    const agged = agg.get(a.key);
     return {
-      key,
-      label: ATTRIBUTES[key].label,
-      teamRating: a ? a.teamRating : null,
-      raterCount: a ? a.raterCount : 0,
-      myValue: myRatings.get(key) ?? null,
-      raters: (ratersByAttr.get(key) ?? []).sort((x, y) => y.value - x.value),
+      key: a.key,
+      label: a.label,
+      short: a.short,
+      teamRating: agged ? agged.teamRating : null,
+      raterCount: agged ? agged.raterCount : 0,
+      myValue: myRatings.get(a.key) ?? null,
+      raters: (ratersByAttr.get(a.key) ?? []).sort((x, y) => y.value - x.value),
+    };
+  });
+
+  const statByDrill = new Map((statRows ?? []).map((s) => [s.drill_key, s]));
+
+  const drills: DrillDetail[] = unionDrills.map((drill) => {
+    const stat = statByDrill.get(drill.key);
+    const measuredCount = Number(stat?.measured_count ?? 0);
+    // SPEC-V2.md section 3.2: the threshold is per drill. A class can have
+    // plenty of 40 times and almost no exit velocities, and each percentile
+    // becomes meaningful on its own schedule.
+    const percentileIsValid = measuredCount >= drill.minTimedForPercentile;
+
+    return {
+      drill,
+      best: stat?.best != null ? Number(stat.best) : null,
+      avg: stat?.avg_value != null ? Number(stat.avg_value) : null,
+      percentile:
+        percentileIsValid && stat?.percentile != null
+          ? Number(stat.percentile)
+          : null,
+      percentileIsValid,
+      measuredCount,
+      attempts: (attemptRows ?? [])
+        .filter((a) => a.drill_key === drill.key)
+        .map((a) => ({
+          attemptNumber: a.attempt_number,
+          value: Number(a.value),
+        })),
     };
   });
 
   const signed = await signHeadshots([p.headshot_url]);
-
-  const timedCount = Number(speed?.timed_count ?? 0);
-  const percentileIsValid = timedCount >= MIN_TIMED_FOR_PERCENTILE;
-  const speedPercentile =
-    percentileIsValid && speed?.speed_percentile != null
-      ? Number(speed.speed_percentile)
-      : null;
 
   const attributeRatings: AttributeRatings = {};
   for (const a of attributes) {
@@ -175,30 +219,42 @@ export async function getProspectDetail(
     }
   }
 
+  const drillPercentiles: DrillPercentiles = {};
+  for (const d of drills) drillPercentiles[d.drill.key] = d.percentile;
+
   return {
-    id: p.id,
-    jerseyNumber: p.jersey_number,
-    firstName: p.first_name,
-    lastName: p.last_name,
-    fullName: `${p.first_name} ${p.last_name}`,
-    primaryPosition: p.primary_position,
-    secondaryPositions,
-    headshotUrl: p.headshot_url ? (signed.get(p.headshot_url) ?? null) : null,
-    headshotPath: p.headshot_url ?? null,
-    attributes,
-    positionRatings: playedPositions.map((position) => ({
-      position,
-      rating: computePositionRating(position, attributeRatings, speedPercentile),
-      missing: missingComponents(position, attributeRatings, speedPercentile),
-    })),
-    bestForty: speed?.best_forty != null ? Number(speed.best_forty) : null,
-    avgForty: speed?.avg_forty != null ? Number(speed.avg_forty) : null,
-    speedPercentile,
-    percentileIsValid,
-    timedCount,
-    fortyAttempts: (attemptRows ?? []).map((a) => ({
-      attemptNumber: a.attempt_number,
-      value: Number(a.value),
-    })),
+    template,
+    prospect: {
+      id: p.id,
+      tryoutId: p.tryout_id,
+      jerseyNumber: p.jersey_number,
+      firstName: p.first_name,
+      lastName: p.last_name,
+      fullName: `${p.first_name} ${p.last_name}`,
+      primaryPosition: p.primary_position,
+      secondaryPositions,
+      headshotUrl: p.headshot_url ? (signed.get(p.headshot_url) ?? null) : null,
+      headshotPath: p.headshot_url ?? null,
+      attributes,
+      drills,
+      positionRatings: playedPositions.map((position) => ({
+        position,
+        label:
+          template.positions.find((tp) => tp.code === position)?.label ??
+          position,
+        rating: computePositionRating(
+          template,
+          position,
+          attributeRatings,
+          drillPercentiles,
+        ),
+        missing: missingComponents(
+          template,
+          position,
+          attributeRatings,
+          drillPercentiles,
+        ),
+      })),
+    },
   };
 }

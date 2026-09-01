@@ -1,16 +1,27 @@
 import { createClient } from "@/lib/supabase/server";
 import { signHeadshots } from "@/lib/data/storage";
-import {
-  POSITIONS,
-  MIN_TIMED_FOR_PERCENTILE,
-  type PositionKey,
-} from "@/lib/config/positions";
+import { getTemplateForTryout } from "@/lib/data/template";
+import { isPositionCode, type Template } from "@/lib/template";
 import {
   computePositionRating,
   missingComponents,
   type AttributeRatings,
+  type DrillPercentiles,
   type PositionRating,
 } from "@/lib/ratings";
+
+/** One prospect's result in a measured drill, from prospect_drill_stats. */
+export type DrillStat = {
+  /** Best attempt: the minimum for a lower_is_better drill, max otherwise. */
+  best: number;
+  avg: number;
+  attempts: number;
+  /**
+   * 0-100 within the tryout class, where 100 is always best regardless of
+   * direction. Null until the drill's minTimedForPercentile is met.
+   */
+  percentile: number | null;
+};
 
 export type ProspectRow = {
   id: string;
@@ -18,8 +29,8 @@ export type ProspectRow = {
   firstName: string;
   lastName: string;
   fullName: string;
-  primaryPosition: PositionKey;
-  secondaryPositions: PositionKey[];
+  primaryPosition: string;
+  secondaryPositions: string[];
   /** Signed, render-ready URL. Null when there is no headshot. */
   headshotUrl: string | null;
   /** Underlying storage path, for replace/remove. */
@@ -31,34 +42,45 @@ export type ProspectRow = {
    * WR and DB belongs on both boards, carrying a different number on each,
    * because the weights differ per position.
    */
-  ratingsByPosition: Partial<Record<PositionKey, PositionRating>>;
+  ratingsByPosition: Record<string, PositionRating>;
   /** Every position played, primary first. */
-  playedPositions: PositionKey[];
+  playedPositions: string[];
   /** What is still missing, for the progress label when primary.rating is null. */
   missing: string[];
-  bestForty: number | null;
-  avgForty: number | null;
-  speedPercentile: number | null;
+  /** Keyed by drill key. Sparse: an unmeasured drill is absent. */
+  drills: Record<string, DrillStat>;
+  /** Percentiles alone, gated by each drill's threshold. Feeds the rating. */
+  drillPercentiles: DrillPercentiles;
   attributeRatings: AttributeRatings;
 };
 
-function isPositionKey(v: unknown): v is PositionKey {
-  return typeof v === "string" && v in POSITIONS;
-}
+export type ProspectsResult = {
+  /** Null when the tryout has no readable template (wrong org, or deleted). */
+  template: Template | null;
+  prospects: ProspectRow[];
+};
 
 /**
- * Every prospect in a tryout with their positional rating already computed.
+ * Every prospect in a tryout with their positional ratings already computed.
  *
- * Three queries rather than one join: the two views aggregate at different
- * grains (one row per prospect per attribute vs one row per prospect), so
- * joining them in SQL would fan out the prospect rows and force a
- * de-duplication pass anyway. At 60-120 prospects this is three small round
- * trips, which SPEC.md section 1 explicitly prefers over cleverness.
+ * Four queries rather than one join: the views aggregate at different grains
+ * (one row per prospect per attribute, one per prospect per drill, one per
+ * prospect), so joining them in SQL would fan out the prospect rows and
+ * force a de-duplication pass anyway. At 60-120 prospects this is a handful
+ * of small round trips, which SPEC.md section 1 explicitly prefers over
+ * cleverness.
+ *
+ * Everything is RLS-scoped, so this returns only what the caller's org
+ * membership allows - cross-org isolation is enforced by the database, not
+ * by remembering to filter here.
  */
-export async function getProspects(tryoutId: string): Promise<ProspectRow[]> {
+export async function getProspects(tryoutId: string): Promise<ProspectsResult> {
   const supabase = await createClient();
 
-  const [{ data: prospects }, { data: attrRows }, { data: speedRows }] =
+  const template = await getTemplateForTryout(tryoutId);
+  if (!template) return { template: null, prospects: [] };
+
+  const [{ data: prospects }, { data: attrRows }, { data: drillRows }] =
     await Promise.all([
       supabase
         .from("prospects")
@@ -71,14 +93,14 @@ export async function getProspects(tryoutId: string): Promise<ProspectRow[]> {
         .from("prospect_attribute_ratings")
         .select("prospect_id, attribute_key, team_rating, rater_count"),
       supabase
-        .from("prospect_speed")
+        .from("prospect_drill_stats")
         .select(
-          "prospect_id, best_forty, avg_forty, speed_percentile, timed_count",
+          "prospect_id, drill_key, best, avg_value, attempts, percentile, measured_count",
         )
         .eq("tryout_id", tryoutId),
     ]);
 
-  if (!prospects) return [];
+  if (!prospects) return { template, prospects: [] };
 
   // Private bucket: paths become signed URLs in one batch, not per row.
   const signed = await signHeadshots(prospects.map((p) => p.headshot_url));
@@ -87,50 +109,70 @@ export async function getProspects(tryoutId: string): Promise<ProspectRow[]> {
   const byProspect = new Map<string, AttributeRatings>();
   for (const r of attrRows ?? []) {
     const existing = byProspect.get(r.prospect_id) ?? {};
-    existing[r.attribute_key as keyof AttributeRatings] = {
+    existing[r.attribute_key] = {
       teamRating: Number(r.team_rating),
       raterCount: Number(r.rater_count),
     };
     byProspect.set(r.prospect_id, existing);
   }
 
-  const speedByProspect = new Map(
-    (speedRows ?? []).map((s) => [s.prospect_id, s]),
-  );
+  // SPEC-V2.md section 3.2: a percentile is meaningless until enough of the
+  // class has done that drill, and the threshold is PER DRILL - a class can
+  // have plenty of 40 times and almost no exit velocities. Below the
+  // threshold the component counts as missing, which gates the rating,
+  // deliberately: a rating built on a meaningless percentile is worse than
+  // no rating.
+  const measuredPerDrill = new Map<string, number>();
+  for (const d of drillRows ?? []) {
+    measuredPerDrill.set(d.drill_key, Number(d.measured_count));
+  }
+  const percentileIsValid = new Map<string, boolean>();
+  for (const drill of template.drills) {
+    percentileIsValid.set(
+      drill.key,
+      (measuredPerDrill.get(drill.key) ?? 0) >= drill.minTimedForPercentile,
+    );
+  }
 
-  // SPEC.md section 8: the percentile is meaningless until enough of the
-  // class has been timed. Below the threshold speed counts as missing, which
-  // gates every rating - deliberately, because a rating built on a
-  // meaningless percentile is worse than no rating.
-  const timedCount = Number(speedRows?.[0]?.timed_count ?? 0);
-  const percentileIsValid = timedCount >= MIN_TIMED_FOR_PERCENTILE;
+  const drillsByProspect = new Map<string, Record<string, DrillStat>>();
+  for (const d of drillRows ?? []) {
+    const existing = drillsByProspect.get(d.prospect_id) ?? {};
+    existing[d.drill_key] = {
+      best: Number(d.best),
+      avg: Number(d.avg_value),
+      attempts: Number(d.attempts),
+      percentile:
+        percentileIsValid.get(d.drill_key) && d.percentile != null
+          ? Number(d.percentile)
+          : null,
+    };
+    drillsByProspect.set(d.prospect_id, existing);
+  }
 
-  return prospects.flatMap((p): ProspectRow[] => {
-    // A position code that is not in the config is data corruption, not a
+  const rows = prospects.flatMap((p): ProspectRow[] => {
+    // A position code that is not in the template is data corruption, not a
     // display problem. Drop the row rather than crash the whole screen.
-    if (!isPositionKey(p.primary_position)) return [];
+    if (!isPositionCode(template, p.primary_position)) return [];
 
     const secondaryPositions = (p.secondary_positions ?? []).filter(
-      isPositionKey,
+      (s: unknown): s is string => isPositionCode(template, s),
     );
     const attributeRatings = byProspect.get(p.id) ?? {};
-    const speed = speedByProspect.get(p.id);
+    const drills = drillsByProspect.get(p.id) ?? {};
 
-    const speedPercentile =
-      percentileIsValid && speed?.speed_percentile != null
-        ? Number(speed.speed_percentile)
-        : null;
+    const drillPercentiles: DrillPercentiles = {};
+    for (const drill of template.drills) {
+      drillPercentiles[drill.key] = drills[drill.key]?.percentile ?? null;
+    }
 
-    const playedPositions: PositionKey[] = [
-      p.primary_position,
-      ...secondaryPositions,
-    ];
-    const ratingsByPosition: Partial<Record<PositionKey, PositionRating>> = {};
+    const playedPositions = [p.primary_position, ...secondaryPositions];
+    const ratingsByPosition: Record<string, PositionRating> = {};
     for (const pos of playedPositions) {
       ratingsByPosition[pos] = computePositionRating(
+        template,
         pos,
         attributeRatings,
-        speedPercentile,
+        drillPercentiles,
       );
     }
 
@@ -144,21 +186,22 @@ export async function getProspects(tryoutId: string): Promise<ProspectRow[]> {
         primaryPosition: p.primary_position,
         secondaryPositions,
         headshotUrl: p.headshot_url ? (signed.get(p.headshot_url) ?? null) : null,
-        /** Raw storage path, for replace/remove. */
         headshotPath: p.headshot_url ?? null,
         primary: ratingsByPosition[p.primary_position]!,
         ratingsByPosition,
         playedPositions,
         missing: missingComponents(
+          template,
           p.primary_position,
           attributeRatings,
-          speedPercentile,
+          drillPercentiles,
         ),
-        bestForty: speed?.best_forty != null ? Number(speed.best_forty) : null,
-        avgForty: speed?.avg_forty != null ? Number(speed.avg_forty) : null,
-        speedPercentile,
+        drills,
+        drillPercentiles,
         attributeRatings,
       },
     ];
   });
+
+  return { template, prospects: rows };
 }

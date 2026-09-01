@@ -4,10 +4,11 @@ import { useRef, useState, useTransition } from "react";
 import Papa from "papaparse";
 import {
   REQUIRED_COLUMNS,
-  OPTIONAL_COLUMNS,
+  optionalColumns,
   validateRoster,
   type RowError,
 } from "@/lib/csv/roster";
+import type { Template } from "@/lib/template";
 import { importRoster, type ImportResult } from "./actions";
 
 type Phase =
@@ -23,7 +24,18 @@ type Phase =
       skippedBlank: number;
     };
 
-export function CsvImport({ takenJerseys }: { takenJerseys: number[] }) {
+export function CsvImport({
+  takenJerseys,
+  template,
+}: {
+  takenJerseys: number[];
+  /**
+   * The tryout's template. Validation runs here in the browser for instant
+   * feedback and AGAIN on the server, which re-reads the template rather
+   * than trusting this copy.
+   */
+  template: Template;
+}) {
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [pending, startTransition] = useTransition();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -47,6 +59,7 @@ export function CsvImport({ takenJerseys }: { takenJerseys: number[] }) {
           parsed.data,
           headers,
           new Set(takenJerseys),
+          template,
         );
         if (!result.ok) {
           setPhase({ kind: "errors", errors: result.errors, fileName: file.name });
@@ -99,7 +112,7 @@ export function CsvImport({ takenJerseys }: { takenJerseys: number[] }) {
       </p>
       <p className="mt-1 text-sm text-muted-foreground">
         Optional:{" "}
-        <code className="text-foreground">{OPTIONAL_COLUMNS.join(", ")}</code>.
+        <code className="text-foreground">{optionalColumns(template).join(", ")}</code>.
       </p>
       <p className="mt-2 text-sm text-muted-foreground">
         <code className="text-foreground">positions</code> is the multi-select

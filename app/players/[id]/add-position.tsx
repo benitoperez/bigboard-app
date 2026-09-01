@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { BOARD_ORDER, POSITIONS, type PositionKey } from "@/lib/config/positions";
 import { addSecondaryPosition } from "./actions";
 
 /**
@@ -19,9 +18,12 @@ import { addSecondaryPosition } from "./actions";
 export function AddPosition({
   prospectId,
   taken,
+  positions,
 }: {
   prospectId: string;
-  taken: PositionKey[];
+  taken: string[];
+  /** The org template's positions, in board order. */
+  positions: { code: string; label: string }[];
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,10 +45,10 @@ export function AddPosition({
     };
   }, [open]);
 
-  const available = BOARD_ORDER.filter((p) => !taken.includes(p));
+  const available = positions.filter((p) => !taken.includes(p.code));
   if (available.length === 0) return null;
 
-  function add(position: PositionKey) {
+  function add(position: string) {
     setError(null);
     startTransition(async () => {
       const res = await addSecondaryPosition(prospectId, position);
@@ -97,19 +99,19 @@ export function AddPosition({
 
             <ul className="space-y-1">
               {available.map((p) => (
-                <li key={p}>
+                <li key={p.code}>
                   <button
                     type="button"
-                    onClick={() => add(p)}
+                    onClick={() => add(p.code)}
                     disabled={pending}
                     className="flex min-h-tap w-full items-center gap-3 rounded-md px-3 text-left
                                active:bg-secondary disabled:opacity-50"
                   >
                     <span className="tnum w-9 shrink-0 text-base font-bold text-primary">
-                      {p}
+                      {p.code}
                     </span>
                     <span className="truncate text-sm text-foreground">
-                      {POSITIONS[p].label}
+                      {p.label}
                     </span>
                   </button>
                 </li>

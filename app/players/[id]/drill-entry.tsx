@@ -2,60 +2,77 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { MAX_FORTY_ATTEMPTS, MIN_TIMED_FOR_PERCENTILE } from "@/lib/config/positions";
-import { saveFortyAttempt, deleteFortyAttempt } from "./forty-actions";
-
-type Attempt = { attemptNumber: number; value: number };
+import type { DrillDetail } from "@/lib/data/prospect-detail";
+import { formatDrillValue } from "@/lib/template";
+import { saveDrillAttempt, deleteDrillAttempt } from "./drill-actions";
 
 /**
- * 40 yard dash entry - SPEC.md sections 8 and 10.3.
+ * Measured drill entry - SPEC.md sections 8 and 10.3, generalized by
+ * SPEC-V2.md section 3.2.
  *
- * Two attempt fields, editable by anyone. Committed on blur or Enter, not on
- * every keystroke: a partially typed "4." is not a time, and firing a write
- * per character would put nonsense in the database between keys.
+ * v1 had one hardcoded 40 section. A template may now define several drills,
+ * so this renders one section per drill the prospect's positions weight,
+ * with the attempt count, units, decimals and value range all coming from
+ * the drill rather than from constants.
+ *
+ * Committed on blur or Enter, not on every keystroke: a partially typed "4."
+ * is not a measurement, and firing a write per character would put nonsense
+ * in the database between keys.
  */
-export function FortyEntry({
+export function DrillEntry({
   prospectId,
-  attempts,
-  bestForty,
-  avgForty,
-  speedPercentile,
-  percentileIsValid,
-  timedCount,
+  drills,
 }: {
   prospectId: string;
-  attempts: Attempt[];
-  bestForty: number | null;
-  avgForty: number | null;
-  speedPercentile: number | null;
-  percentileIsValid: boolean;
-  timedCount: number;
+  drills: DrillDetail[];
 }) {
+  if (drills.length === 0) return null;
+
+  return (
+    <>
+      {drills.map((d) => (
+        <DrillSection key={d.drill.key} prospectId={prospectId} detail={d} />
+      ))}
+    </>
+  );
+}
+
+function DrillSection({
+  prospectId,
+  detail,
+}: {
+  prospectId: string;
+  detail: DrillDetail;
+}) {
+  const { drill, best, avg, percentile, percentileIsValid, measuredCount, attempts } =
+    detail;
+
   return (
     <section className="mt-6">
       <h2 className="text-xs font-semibold tracking-[0.15em] text-muted-foreground uppercase">
-        40 Yard Dash
+        {drill.label}
       </h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        Any officer can record, correct, or clear either attempt. The best time feeds
-        the rating.
+        Anyone can record, correct, or clear an attempt. The{" "}
+        {drill.direction === "lower_is_better" ? "fastest" : "best"} result
+        feeds the rating.
       </p>
 
       <div className="mt-2 rounded-lg border border-border bg-card p-4">
         <div className="flex gap-3">
-          {Array.from({ length: MAX_FORTY_ATTEMPTS }, (_, i) => {
+          {Array.from({ length: drill.maxAttempts }, (_, i) => {
             const n = i + 1;
             const existing = attempts.find((a) => a.attemptNumber === n);
             return (
               <AttemptField
                 key={n}
                 prospectId={prospectId}
+                drillKey={drill.key}
+                decimals={drill.decimals}
                 attemptNumber={n}
-                initial={existing ? existing.value.toFixed(2) : ""}
+                initial={existing ? existing.value.toFixed(drill.decimals) : ""}
                 isBest={
-                  existing != null &&
-                  bestForty != null &&
-                  existing.value === bestForty
+                  existing != null && best != null && existing.value === best
                 }
               />
             );
@@ -63,20 +80,20 @@ export function FortyEntry({
         </div>
 
         <div className="mt-4 border-t border-border pt-3">
-          {bestForty === null ? (
+          {best === null ? (
             <p className="text-sm text-muted-foreground">
-              No time recorded yet.
+              Nothing recorded yet.
             </p>
           ) : (
             <p className="tnum text-base font-bold text-foreground">
-              {bestForty.toFixed(2)}{" "}
+              {formatDrillValue(drill, best)}{" "}
               <span className="text-xs font-normal text-muted-foreground">
                 best
               </span>
-              {avgForty !== null && (
+              {avg !== null && (
                 <>
                   {" / "}
-                  {avgForty.toFixed(2)}{" "}
+                  {formatDrillValue(drill, avg)}{" "}
                   <span className="text-xs font-normal text-muted-foreground">
                     avg
                   </span>
@@ -88,19 +105,19 @@ export function FortyEntry({
           {/* SPEC.md section 8: the percentile is against THIS tryout class
               only. A 4.9 at a club flag football tryout and a 4.9 at a
               combine are not the same fact. */}
-          {bestForty !== null &&
-            (percentileIsValid && speedPercentile !== null ? (
+          {best !== null &&
+            (percentileIsValid && percentile !== null ? (
               <p className="mt-1 text-sm text-muted-foreground">
                 <span className="tnum font-bold text-foreground">
-                  {ordinal(speedPercentile)}
+                  {ordinal(percentile)}
                 </span>{" "}
-                percentile of the {timedCount} timed in this tryout
+                percentile of the {measuredCount} measured in this tryout
               </p>
             ) : (
               <p className="mt-1 text-xs text-muted-foreground">
-                Percentile hidden until {MIN_TIMED_FOR_PERCENTILE} prospects
-                are timed &mdash; {timedCount} so far. Speed counts as missing
-                until then, so ratings stay gated.
+                Percentile hidden until {drill.minTimedForPercentile} prospects
+                are measured &mdash; {measuredCount} so far. This drill counts
+                as missing until then, so ratings stay gated.
               </p>
             ))}
         </div>
@@ -111,11 +128,15 @@ export function FortyEntry({
 
 function AttemptField({
   prospectId,
+  drillKey,
+  decimals,
   attemptNumber,
   initial,
   isBest,
 }: {
   prospectId: string;
+  drillKey: string;
+  decimals: number;
   attemptNumber: number;
   initial: string;
   isBest: boolean;
@@ -132,15 +153,15 @@ function AttemptField({
 
     setError(null);
 
-    // Emptying a field that held a time clears the attempt. Emptying one that
-    // was already empty is a no-op, not a delete of nothing.
+    // Emptying a field that held a value clears the attempt. Emptying one
+    // that was already empty is a no-op, not a delete of nothing.
     if (trimmed === "") {
       if (committedRef.current === "") return;
       startTransition(async () => {
-        const res = await deleteFortyAttempt(prospectId, attemptNumber);
+        const res = await deleteDrillAttempt(prospectId, drillKey, attemptNumber);
         if (!res.ok) {
           setError(res.error);
-          setValue(committedRef.current); // put the time back
+          setValue(committedRef.current); // put the value back
           return;
         }
         committedRef.current = "";
@@ -150,21 +171,28 @@ function AttemptField({
     }
 
     startTransition(async () => {
-      const res = await saveFortyAttempt(prospectId, attemptNumber, trimmed);
+      const res = await saveDrillAttempt(
+        prospectId,
+        drillKey,
+        attemptNumber,
+        trimmed,
+      );
       if (!res.ok) {
         setError(res.error);
         return;
       }
-      committedRef.current = Number(trimmed).toFixed(2);
+      committedRef.current = Number(trimmed).toFixed(decimals);
       setValue(committedRef.current);
       router.refresh();
     });
   }
 
+  const fieldId = `${drillKey}-${attemptNumber}`;
+
   return (
     <div className="flex-1">
       <label
-        htmlFor={`forty-${attemptNumber}`}
+        htmlFor={fieldId}
         className="flex items-center gap-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
       >
         Attempt {attemptNumber}
@@ -175,7 +203,7 @@ function AttemptField({
         )}
       </label>
       <input
-        id={`forty-${attemptNumber}`}
+        id={fieldId}
         type="text"
         inputMode="decimal"
         placeholder="--.--"

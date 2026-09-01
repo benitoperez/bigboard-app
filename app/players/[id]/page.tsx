@@ -5,12 +5,11 @@ import { getProspectDetail } from "@/lib/data/prospect-detail";
 import { getActiveTryout } from "@/lib/data/tryouts";
 import { getSelectedIds } from "@/lib/data/selections";
 import { getComments } from "@/lib/data/comments";
-import { POSITIONS, MIN_TIMED_FOR_PERCENTILE } from "@/lib/config/positions";
 import { Avatar, PositionChip } from "@/components/avatar";
 import { Dial } from "@/components/dial";
 import { RatingSlider } from "./rating-slider";
 import { AddPosition } from "./add-position";
-import { FortyEntry } from "./forty-entry";
+import { DrillEntry } from "./drill-entry";
 import { SelectToggle } from "@/components/select-toggle";
 import { Comments } from "./comments";
 import { HeadshotUpload } from "./headshot-upload";
@@ -25,8 +24,9 @@ export default async function ProspectPage({
   const { officer } = await getOfficer();
   if (!officer) redirect("/login");
 
-  const p = await getProspectDetail(id, officer.id);
-  if (!p) notFound();
+  const detail = await getProspectDetail(id, officer.id);
+  if (!detail) notFound();
+  const { template, prospect: p } = detail;
 
   const [tryout, comments] = await Promise.all([
     getActiveTryout(),
@@ -65,9 +65,17 @@ export default async function ProspectPage({
               {p.fullName}
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-1">
-              <PositionChip position={p.primaryPosition} />
-              {p.secondaryPositions.map((s) => (
-                <PositionChip key={s} position={s} muted />
+              <PositionChip
+                position={p.primaryPosition}
+                label={primaryRating.label}
+              />
+              {secondaryRatings.map((r) => (
+                <PositionChip
+                  key={r.position}
+                  position={r.position}
+                  label={r.label}
+                  muted
+                />
               ))}
             </div>
 
@@ -113,6 +121,10 @@ export default async function ProspectPage({
           <AddPosition
             prospectId={p.id}
             taken={[p.primaryPosition, ...p.secondaryPositions]}
+            positions={template.positions
+              .slice()
+              .sort((a, b) => a.sortOrder - b.sortOrder)
+              .map((tp) => ({ code: tp.code, label: tp.label }))}
           />
         </div>
 
@@ -126,32 +138,41 @@ export default async function ProspectPage({
           />
         )}
 
-        {/* Speed strip. Styled apart from the dials on purpose: this is a
-            measurement, not an opinion, and the design should say so. It
-            carries only the headline fact - the 40 section below owns both
-            attempts and the editing. */}
-        <div className="mt-4 flex items-baseline gap-2 rounded-md border border-border-strong bg-secondary px-3 py-2">
-          <p className="text-[11px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
-            40
-          </p>
-          {p.bestForty === null ? (
-            <p className="text-sm text-muted-foreground">Not timed</p>
-          ) : (
-            <>
-              <p className="tnum text-lg font-bold text-foreground">
-                {p.bestForty.toFixed(2)}
-                <span className="ml-1 text-xs font-normal text-muted-foreground">
-                  s
-                </span>
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {p.speedPercentile !== null
-                  ? `${ordinal(p.speedPercentile)} percentile in this tryout`
-                  : `percentile at ${MIN_TIMED_FOR_PERCENTILE} timed`}
-              </p>
-            </>
-          )}
-        </div>
+        {/* Measurement strip. Styled apart from the dials on purpose: these
+            are measurements, not opinions, and the design should say so. It
+            carries only the headline facts - the drill sections below own
+            the attempts and the editing. */}
+        {p.drills.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {p.drills.map((d) => (
+              <div
+                key={d.drill.key}
+                className="flex flex-1 items-baseline gap-2 rounded-md border border-border-strong bg-secondary px-3 py-2"
+              >
+                <p className="text-[11px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
+                  {d.drill.label}
+                </p>
+                {d.best === null ? (
+                  <p className="text-sm text-muted-foreground">Not measured</p>
+                ) : (
+                  <>
+                    <p className="tnum text-lg font-bold text-foreground">
+                      {d.best.toFixed(d.drill.decimals)}
+                      <span className="ml-1 text-xs font-normal text-muted-foreground">
+                        {d.drill.unit}
+                      </span>
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {d.percentile !== null
+                        ? `${ordinal(d.percentile)} pct`
+                        : `pct at ${d.drill.minTimedForPercentile}`}
+                    </p>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </header>
 
       {/* ---- Rating section ---- */}
@@ -177,16 +198,8 @@ export default async function ProspectPage({
         </div>
       </section>
 
-      {/* ---- 40 section (SPEC.md section 10.3) ---- */}
-      <FortyEntry
-        prospectId={p.id}
-        attempts={p.fortyAttempts}
-        bestForty={p.bestForty}
-        avgForty={p.avgForty}
-        speedPercentile={p.speedPercentile}
-        percentileIsValid={p.percentileIsValid}
-        timedCount={p.timedCount}
-      />
+      {/* ---- Measured drills (SPEC.md section 10.3) ---- */}
+      <DrillEntry prospectId={p.id} drills={p.drills} />
 
       {/* ---- Comments (SPEC.md section 10.3) ---- */}
       <div>
@@ -231,7 +244,7 @@ function PositionScore({
   missing,
   primary = false,
 }: {
-  code: keyof typeof POSITIONS;
+  code: string;
   rating: number | null;
   inputs: number;
   covered: number;

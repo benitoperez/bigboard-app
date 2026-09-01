@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { BOARD_ORDER, type PositionKey } from "@/lib/config/positions";
 import { ratingColor, formatRating } from "@/lib/rating-color";
 import { Avatar, PositionChip } from "@/components/avatar";
 import { SelectToggle } from "@/components/select-toggle";
@@ -19,13 +18,19 @@ function matches(p: ProspectRow, q: string) {
 export function PlayersList({
   prospects,
   selectedIds,
+  positions,
 }: {
   prospects: ProspectRow[];
   selectedIds: string[];
+  /**
+   * The org template's positions, in board order. Passed in rather than
+   * imported: this is a client component and the template is a server read.
+   */
+  positions: { code: string; label: string }[];
 }) {
   const selected = new Set(selectedIds);
   const [query, setQuery] = useState("");
-  const [position, setPosition] = useState<PositionKey | null>(null);
+  const [position, setPosition] = useState<string | null>(null);
 
   const visible = useMemo(
     () =>
@@ -38,6 +43,9 @@ export function PlayersList({
       ),
     [prospects, query, position],
   );
+
+  const labelFor = (code: string) =>
+    positions.find((x) => x.code === code)?.label ?? code;
 
   return (
     <>
@@ -56,20 +64,21 @@ export function PlayersList({
         />
       </div>
 
-      {/* Position filter chips. Order comes from BOARD_ORDER so priority
-          positions can be reordered in config without touching this file. */}
+      {/* Position filter chips. Order comes from the template's sort order,
+          so priority positions can be reordered in the template editor
+          without touching this file. */}
       <div className="-mx-6 mt-3 flex gap-2 overflow-x-auto px-6 pb-1">
         <FilterChip
           label="All"
           active={position === null}
           onClick={() => setPosition(null)}
         />
-        {BOARD_ORDER.map((p) => (
+        {positions.map((p) => (
           <FilterChip
-            key={p}
-            label={p}
-            active={position === p}
-            onClick={() => setPosition(position === p ? null : p)}
+            key={p.code}
+            label={p.code}
+            active={position === p.code}
+            onClick={() => setPosition(position === p.code ? null : p.code)}
           />
         ))}
       </div>
@@ -101,9 +110,17 @@ export function PlayersList({
                   </span>
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-1">
-                  <PositionChip position={p.primaryPosition} />
+                  <PositionChip
+                    position={p.primaryPosition}
+                    label={labelFor(p.primaryPosition)}
+                  />
                   {p.secondaryPositions.map((s) => (
-                    <PositionChip key={s} position={s} muted />
+                    <PositionChip
+                      key={s}
+                      position={s}
+                      label={labelFor(s)}
+                      muted
+                    />
                   ))}
                 </div>
               </div>

@@ -1,4 +1,4 @@
-import { POSITIONS, type PositionKey } from "@/lib/config/positions";
+import type { Template, TemplateDrill } from "@/lib/template";
 
 /**
  * Roster CSV validation - SPEC.md section 12.
@@ -15,6 +15,11 @@ import { POSITIONS, type PositionKey } from "@/lib/config/positions";
  * Pure on purpose: no Supabase, no papaparse. The dirty data is the hard part
  * here, not the parsing, so it needs to be testable directly.
  * See scripts/verify-roster.ts.
+ *
+ * SPEC-V2.md: the drill columns are TEMPLATE-DRIVEN. A flag football sheet
+ * still carries forty_1 and forty_2; a baseball sheet carries
+ * exit_velocity_1, sixty_yard_dash_1 and so on. Nothing here knows the name
+ * of a single drill.
  */
 
 export const REQUIRED_COLUMNS = [
@@ -24,28 +29,62 @@ export const REQUIRED_COLUMNS = [
   "positions",
 ] as const;
 
-export const OPTIONAL_COLUMNS = ["forty_1", "forty_2", "selected"] as const;
+const SELECTED_ALIASES = ["selected", "select", "is_selected", "team", "keep"];
 
 /**
- * Accepted spellings for the optional columns. A real sheet header is
- * whatever the person who built it typed.
+ * Accepted spellings for one drill attempt column. A real sheet header is
+ * whatever the person who built it typed, so the drill's key AND its label
+ * both generate candidates - "forty_1", "40_1" and "40 yard dash 1" all
+ * reach the same column, without any drill name being written out here.
  */
-const COLUMN_ALIASES: Record<string, readonly string[]> = {
-  forty_1: ["forty_1", "forty1", "40_1", "401", "forty_time_1", "40 time 1", "forty 1"],
-  forty_2: ["forty_2", "forty2", "40_2", "402", "forty_time_2", "40 time 2", "forty 2"],
-  selected: ["selected", "select", "is_selected", "team", "keep"],
-};
+export function drillColumnAliases(
+  drill: TemplateDrill,
+  attempt: number,
+): string[] {
+  const stems = new Set<string>([drill.key, drill.label.toLowerCase()]);
+
+  // A label that opens with a number gives the shorthand people actually
+  // type: "40 Yard Dash" -> "40".
+  const leadingNumber = drill.label.match(/^(\d+)/)?.[1];
+  if (leadingNumber) stems.add(leadingNumber);
+
+  const out = new Set<string>();
+  for (const stem of stems) {
+    const base = stem.trim().toLowerCase();
+    const snake = base.replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+    const spaced = base.replace(/[^a-z0-9]+/g, " ").trim();
+    out.add(`${snake}_${attempt}`);
+    out.add(`${snake}${attempt}`);
+    out.add(`${spaced} ${attempt}`);
+    out.add(`${snake}_time_${attempt}`);
+    out.add(`${spaced} time ${attempt}`);
+  }
+  return [...out];
+}
+
+/** Every optional column this template accepts, for error messages and docs. */
+export function optionalColumns(template: Template): string[] {
+  const cols: string[] = [];
+  for (const drill of template.drills) {
+    for (let n = 1; n <= drill.maxAttempts; n++) cols.push(`${drill.key}_${n}`);
+  }
+  cols.push("selected");
+  return cols;
+}
 
 export type RosterRow = {
   first_name: string;
   last_name: string;
   jersey_number: number;
   /** First value from the positions cell. */
-  primary_position: PositionKey;
+  primary_position: string;
   /** The rest, deduped, never containing the primary. */
-  secondary_positions: PositionKey[];
-  forty_1: number | null;
-  forty_2: number | null;
+  secondary_positions: string[];
+  /**
+   * Parsed attempts per drill key, indexed by attempt number (1-based) with
+   * null for a blank cell. Only drills the template defines appear.
+   */
+  drills: Record<string, (number | null)[]>;
   selected: boolean;
 };
 
@@ -58,8 +97,6 @@ export type RowError = {
 export type ValidationResult =
   | { ok: true; rows: RosterRow[]; skippedBlank: number }
   | { ok: false; errors: RowError[]; skippedBlank: number };
-
-const VALID_POSITIONS = Object.keys(POSITIONS) as PositionKey[];
 
 /**
  * "R (Rush)" -> "R", "  wr " -> "WR".
@@ -75,9 +112,8 @@ export function normalizePosition(raw: string): string {
 /** Read a column under any of its accepted spellings. */
 function readColumn(
   rec: Record<string, unknown>,
-  canonical: string,
+  accepted: readonly string[],
 ): string | undefined {
-  const accepted = COLUMN_ALIASES[canonical] ?? [canonical];
   for (const key of Object.keys(rec)) {
     if (accepted.includes(key.trim().toLowerCase())) {
       return String(rec[key] ?? "").trim();
@@ -96,12 +132,16 @@ function isBlankRecord(rec: Record<string, unknown>) {
  * @param records Parsed CSV rows, header-keyed (papaparse `header: true`).
  * @param headers The header row as parsed, to report missing columns.
  * @param existingJerseys Jersey numbers already used in this tryout.
+ * @param template The tryout's evaluation template: the ONLY source of valid
+ *   position codes and of which drill columns exist.
  */
 export function validateRoster(
   records: Record<string, unknown>[],
   headers: string[],
   existingJerseys: ReadonlySet<number>,
+  template: Template,
 ): ValidationResult {
+  const validPositions = template.positions.map((p) => p.code);
   const errors: RowError[] = [];
 
   // --- header check. Without columns nothing else is worth reporting. ---
@@ -177,8 +217,8 @@ export function validateRoster(
 
     // --- positions (multi-select cell) ---
     // First value is primary, the rest are secondary. Order is meaningful.
-    let primary: PositionKey | null = null;
-    const secondary: PositionKey[] = [];
+    let primary: string | null = null;
+    const secondary: string[] = [];
 
     if (!positionsRaw) {
       errors.push({
@@ -195,16 +235,16 @@ export function validateRoster(
         errors.push({ line, message: "positions has no usable values." });
       }
 
-      const seen = new Set<PositionKey>();
+      const seen = new Set<string>();
       for (const part of parts) {
-        if (!VALID_POSITIONS.includes(part as PositionKey)) {
+        if (!validPositions.includes(part)) {
           errors.push({
             line,
-            message: `position "${part}" is not a known position. Valid: ${VALID_POSITIONS.join(", ")}.`,
+            message: `position "${part}" is not a known position. Valid: ${validPositions.join(", ")}.`,
           });
           continue;
         }
-        const key = part as PositionKey;
+        const key = part;
         // Duplicates within a cell collapse; a prospect cannot be his own
         // secondary position.
         if (seen.has(key)) continue;
@@ -214,36 +254,45 @@ export function validateRoster(
       }
     }
 
-    // --- optional 40 times ---
-    // A blank cell means not timed. Something unparseable IS an error -
-    // silently dropping a time the user believes they imported is worse than
-    // refusing the file.
-    const forty: Record<1 | 2, number | null> = { 1: null, 2: null };
-    for (const attempt of [1, 2] as const) {
-      const raw = readColumn(rec, `forty_${attempt}`);
-      if (raw === undefined || raw === "") continue;
-      if (!/^\d{1,2}(\.\d{1,2})?$/.test(raw)) {
-        errors.push({
-          line,
-          message: `40 time "${raw}" (attempt ${attempt}) is not a time like 4.61.`,
-        });
-        continue;
+    // --- optional drill columns, one group per measured drill ---
+    // A blank cell means not measured. Something unparseable IS an error -
+    // silently dropping a value the user believes they imported is worse
+    // than refusing the file.
+    const drills: Record<string, (number | null)[]> = {};
+    for (const drill of template.drills) {
+      const attempts: (number | null)[] = [];
+      for (let n = 1; n <= drill.maxAttempts; n++) {
+        const raw = readColumn(rec, drillColumnAliases(drill, n));
+        if (raw === undefined || raw === "") {
+          attempts.push(null);
+          continue;
+        }
+        if (!/^\d{1,3}(\.\d{1,3})?$/.test(raw)) {
+          errors.push({
+            line,
+            message: `${drill.label} "${raw}" (attempt ${n}) is not a number.`,
+          });
+          attempts.push(null);
+          continue;
+        }
+        const v = Number(raw);
+        // The drill's own range, not a hardcoded 40-time window.
+        if (!(v > drill.valueMin && v <= drill.valueMax)) {
+          errors.push({
+            line,
+            message: `${drill.label} ${v} (attempt ${n}) must be between ${drill.valueMin} and ${drill.valueMax} ${drill.unit}.`,
+          });
+          attempts.push(null);
+          continue;
+        }
+        attempts.push(v);
       }
-      const v = Number(raw);
-      // Mirrors the CHECK constraint: value > 0 and value < 20.
-      if (!(v > 0 && v < 20)) {
-        errors.push({
-          line,
-          message: `40 time ${v} (attempt ${attempt}) must be between 0 and 20 seconds.`,
-        });
-        continue;
-      }
-      forty[attempt] = v;
+      drills[drill.key] = attempts;
     }
 
     // --- optional selected flag ---
     let selected = false;
-    const selRaw = readColumn(rec, "selected");
+    const selRaw = readColumn(rec, SELECTED_ALIASES);
     if (selRaw !== undefined && selRaw !== "") {
       const v = selRaw.toLowerCase();
       if (v === "true" || v === "1") selected = true;
@@ -263,8 +312,7 @@ export function validateRoster(
         jersey_number: jersey,
         primary_position: primary,
         secondary_positions: secondary,
-        forty_1: forty[1],
-        forty_2: forty[2],
+        drills,
         selected,
       });
     }

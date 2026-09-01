@@ -3,9 +3,10 @@
  *
  *   npm run seed:dev > /tmp/seed-dev.sql
  *
- * Positions and attributes are READ FROM lib/config/positions.ts, never
- * written out here - CLAUDE.md rule 2. That is the whole reason this is a
- * generator rather than a hand-written .sql file.
+ * Positions, attributes and drills are READ FROM the seeded flag football
+ * template in supabase/migration-v2.sql, never written out here. That is the
+ * whole reason this is a generator rather than a hand-written .sql file:
+ * one source of truth for the config, and fake data that follows it.
  *
  * The generated SQL resolves the tryout and officer by lookup, so no UUIDs
  * are baked into anything committed.
@@ -15,16 +16,28 @@
  *   - fully rated prospects that should show a number
  *   - partially rated ones that must show progress instead
  *   - unrated ones
- *   - more than MIN_TIMED_FOR_PERCENTILE prospects with a 40 time, so the
- *     speed percentile becomes valid
+ *   - more prospects measured than the drill's minTimedForPercentile, so
+ *     the percentile becomes valid
  */
 
-import {
-  BOARD_ORDER,
-  POSITIONS,
-  MAX_FORTY_ATTEMPTS,
-  type PositionKey,
-} from "../lib/config/positions";
+import { FLAG_FOOTBALL } from "./seed-templates";
+import { boardOrder } from "../lib/template";
+
+const TEMPLATE = FLAG_FOOTBALL;
+// The seeded flag football template defines exactly one drill; the generator
+// fills whichever drill that is rather than naming it.
+const DRILL = TEMPLATE.drills[0];
+const BOARD = boardOrder(TEMPLATE).map((p) => p.code);
+
+/** The judged attributes a position is scored on, derived from its weights. */
+function attributesFor(code: string): string[] {
+  return (
+    TEMPLATE.positions
+      .find((p) => p.code === code)
+      ?.components.filter((c) => c.kind === "attribute")
+      .map((c) => c.key) ?? []
+  );
+}
 
 // Deterministic PRNG so reruns produce identical data.
 let seed = 20260913;
@@ -54,20 +67,20 @@ const LAST = [
   "Hollis", "Marsh", "Padilla", "Quinn", "Rowe", "Tate", "Underwood", "Vance",
 ];
 
-const POSITION_KEYS = Object.keys(POSITIONS) as PositionKey[];
+const POSITION_KEYS = TEMPLATE.positions.map((p) => p.code);
 
 // Roughly how a flag football tryout actually skews, indexed against
-// BOARD_ORDER rather than naming positions - add a position to the config and
+// board order rather than naming positions - add a position to the template and
 // it gets seeded automatically at the default count instead of being silently
 // skipped. CLAUDE.md rule 2.
 const COUNT_BY_BOARD_INDEX = [4, 6, 10, 8, 6, 6];
 const DEFAULT_COUNT = 6;
-const DISTRIBUTION: PositionKey[] = BOARD_ORDER.flatMap((p, i) =>
-  Array<PositionKey>(COUNT_BY_BOARD_INDEX[i] ?? DEFAULT_COUNT).fill(p),
+const DISTRIBUTION: string[] = BOARD.flatMap((p, i) =>
+  Array<string>(COUNT_BY_BOARD_INDEX[i] ?? DEFAULT_COUNT).fill(p),
 );
 
 const TOTAL = DISTRIBUTION.length;
-const WITH_FORTY = 24;      // > MIN_TIMED_FOR_PERCENTILE (15), so percentiles turn on
+const WITH_FORTY = 24;      // > the drill's minTimedForPercentile, so percentiles turn on
 const FULLY_RATED = 22;     // should display a rating
 const PARTIALLY_RATED = 9;  // should display progress instead
 // remainder gets nothing
@@ -87,7 +100,7 @@ lines.push("");
 
 // ---- prospects ----------------------------------------------------------
 const jerseys = new Set<number>();
-type P = { jersey: number; first: string; last: string; pos: PositionKey; secondary: PositionKey[] };
+type P = { jersey: number; first: string; last: string; pos: string; secondary: string[] };
 const prospects: P[] = [];
 
 for (let i = 0; i < TOTAL; i++) {
@@ -99,7 +112,7 @@ for (let i = 0; i < TOTAL; i++) {
 
   const pos = DISTRIBUTION[i];
   // About a third try out at a second position.
-  const secondary: PositionKey[] = [];
+  const secondary: string[] = [];
   if (rand() < 0.35) {
     const other = pick(POSITION_KEYS.filter((p) => p !== pos));
     secondary.push(other);
@@ -134,33 +147,33 @@ lines.push(") as v(jersey, first, last, pos, sec);");
 lines.push("");
 
 // ---- 40 yard dash -------------------------------------------------------
-lines.push("-- 40 times. Enough prospects timed to make the percentile valid.");
+lines.push(`-- ${DRILL.label} results. Enough measured to make the percentile valid.`);
 const timed = prospects.slice(0, WITH_FORTY);
 const drillRows: string[] = [];
 for (const p of timed) {
-  const attempts = rand() < 0.5 ? MAX_FORTY_ATTEMPTS : 1;
+  const attempts = rand() < 0.5 ? DRILL.maxAttempts : 1;
   // OL run slower; skill positions faster.
   const base = p.pos === "OL" ? between(5.1, 5.9) : between(4.35, 5.25);
   for (let a = 1; a <= attempts; a++) {
-    const v = (base + (a === 1 ? 0 : between(-0.06, 0.14))).toFixed(2);
+    const v = (base + (a === 1 ? 0 : between(-0.06, 0.14))).toFixed(DRILL.decimals);
     drillRows.push(`  (${p.jersey}, ${a}, ${v})`);
   }
 }
 lines.push(
   "insert into drill_results (prospect_id, drill_key, attempt_number, value, recorded_by)",
 );
-lines.push("select p.id, 'forty', v.attempt, v.val, o.id");
+lines.push(`select p.id, '${DRILL.key}', v.attempt, v.val, o.id`);
 lines.push("from (values");
 lines.push(drillRows.join(",\n"));
 lines.push(") as v(jersey, attempt, val)");
 lines.push("join prospects p on p.jersey_number = v.jersey");
 lines.push("  and p.tryout_id = (select id from tryouts where is_active order by created_at limit 1)");
-lines.push("cross join (select id from officers order by created_at limit 1) o;");
+lines.push("cross join (select id from profiles order by created_at limit 1) o;");
 lines.push("");
 
 // ---- ratings ------------------------------------------------------------
 lines.push("-- Ratings from the seeded officer. Attribute keys come from");
-lines.push("-- lib/config/positions.ts via the generator, never hardcoded.");
+lines.push("-- the seeded template via the generator, never hardcoded.");
 const ratingRows: string[] = [];
 prospects.forEach((p, i) => {
   const full = i < FULLY_RATED;
@@ -170,7 +183,7 @@ prospects.forEach((p, i) => {
   // Union of attributes across all positions this prospect plays.
   const attrs = new Set<string>();
   for (const pos of [p.pos, ...p.secondary]) {
-    for (const a of POSITIONS[pos].attributes) attrs.add(a);
+    for (const a of attributesFor(pos)) attrs.add(a);
   }
   let list = [...attrs];
   // Partial prospects are missing one required attribute, so the gate fires.
@@ -188,7 +201,7 @@ lines.push(ratingRows.join(",\n"));
 lines.push(") as v(jersey, attr, val)");
 lines.push("join prospects p on p.jersey_number = v.jersey");
 lines.push("  and p.tryout_id = (select id from tryouts where is_active order by created_at limit 1)");
-lines.push("cross join (select id from officers order by created_at limit 1) o;");
+lines.push("cross join (select id from profiles order by created_at limit 1) o;");
 lines.push("");
 lines.push("commit;");
 

@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getOfficer } from "@/lib/auth";
-import { POSITIONS, type PositionKey } from "@/lib/config/positions";
+import { getTemplateForTryout } from "@/lib/data/template";
+import { isPositionCode } from "@/lib/template";
 
 export type AddAthleteResult =
   | { ok: true; id: string }
@@ -12,11 +13,11 @@ export type AddAthleteResult =
 /**
  * Add one athlete by hand.
  *
- * Open to ANY officer, not just admins - this matches the write_prospects
- * policy, which is `with check (true)` because roster management is
- * collaborative (SPEC.md section 5). Someone walks up mid-tryout and is not
- * on the imported sheet; whoever is holding a phone should be able to add
- * him. Deleting stays admin-only, because that is the destructive direction.
+ * Open to any EVALUATOR and up, matching the prospects_insert policy
+ * (SPEC-V2.md section 2.5). Roster management is collaborative: someone
+ * walks up mid-tryout and is not on the imported sheet, and whoever is
+ * holding a phone should be able to add him. Deleting stays admin-only,
+ * because that is the destructive direction, and viewers write nothing.
  */
 export async function addAthlete(input: {
   firstName: string;
@@ -42,16 +43,6 @@ export async function addAthlete(input: {
     return { ok: false, error: "Jersey number is out of range." };
   }
 
-  // Positions are checked against POSITIONS, never a list written out here.
-  if (!(input.primaryPosition in POSITIONS)) {
-    return { ok: false, error: "Pick a primary position." };
-  }
-  const primary = input.primaryPosition as PositionKey;
-
-  const secondary = [...new Set(input.secondaryPositions)].filter(
-    (p): p is PositionKey => p in POSITIONS && p !== primary,
-  );
-
   const supabase = await createClient();
 
   const { data: tryout } = await supabase
@@ -65,6 +56,22 @@ export async function addAthlete(input: {
   if (!tryout) {
     return { ok: false, error: "There is no active tryout to add to." };
   }
+
+  // Positions are checked against the tryout's own template, never a list
+  // written out here. A code the template does not define would leave the
+  // prospect rated on the wrong attributes for the rest of the tryout.
+  const template = await getTemplateForTryout(tryout.id);
+  if (!template) {
+    return { ok: false, error: "This tryout has no evaluation template." };
+  }
+  if (!isPositionCode(template, input.primaryPosition)) {
+    return { ok: false, error: "Pick a primary position." };
+  }
+  const primary = input.primaryPosition;
+
+  const secondary = [...new Set(input.secondaryPositions)].filter(
+    (p) => isPositionCode(template, p) && p !== primary,
+  );
 
   const { data, error } = await supabase
     .from("prospects")

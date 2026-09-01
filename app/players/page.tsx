@@ -5,6 +5,7 @@ import { tryoutPeriod } from "@/lib/tryouts";
 import { getSelectedIds } from "@/lib/data/selections";
 import { PlayersList } from "./players-list";
 import { AddAthlete } from "./add-athlete";
+import { boardOrder } from "@/lib/template";
 
 export const metadata: Metadata = { title: "Players - Big Board" };
 
@@ -23,10 +24,21 @@ export default async function PlayersPage() {
     );
   }
 
-  const [prospects, selectedIds] = await Promise.all([
+  const [{ template, prospects }, selectedIds] = await Promise.all([
     getProspects(tryout.id),
     getSelectedIds(tryout.id),
   ]);
+
+  if (!template) {
+    return (
+      <main className="safe-top safe-bottom px-6 py-8">
+        <h1 className="text-4xl tracking-tight uppercase">Players</h1>
+        <p className="mt-6 text-sm text-muted-foreground">
+          This tryout has no evaluation template.
+        </p>
+      </main>
+    );
+  }
 
   return (
     <main className="safe-top safe-bottom px-6 py-8">
@@ -38,7 +50,13 @@ export default async function PlayersPage() {
           </p>
           <h1 className="mt-1 text-4xl tracking-tight uppercase">Players</h1>
         </div>
-        <AddAthlete tryoutName={tryout.name} />
+        <AddAthlete
+          tryoutName={tryout.name}
+          positions={boardOrder(template).map((p) => ({
+            code: p.code,
+            label: p.label,
+          }))}
+        />
       </header>
 
       {prospects.length === 0 ? (
@@ -47,7 +65,14 @@ export default async function PlayersPage() {
           one at a time, or import a roster CSV from the Account screen.
         </p>
       ) : (
-        <PlayersList prospects={prospects} selectedIds={[...selectedIds]} />
+        <PlayersList
+          prospects={prospects}
+          selectedIds={[...selectedIds]}
+          positions={boardOrder(template).map((p) => ({
+            code: p.code,
+            label: p.label,
+          }))}
+        />
       )}
     </main>
   );

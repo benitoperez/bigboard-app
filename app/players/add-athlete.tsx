@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { BOARD_ORDER, POSITIONS, type PositionKey } from "@/lib/config/positions";
 import { addAthlete } from "./add-actions";
 
 /**
@@ -13,7 +12,16 @@ import { addAthlete } from "./add-actions";
  * on a phone, and a sheet cannot end up half off-screen the way an anchored
  * panel can.
  */
-export function AddAthlete({ tryoutName }: { tryoutName: string }) {
+export type PositionOption = { code: string; label: string };
+
+export function AddAthlete({
+  tryoutName,
+  positions,
+}: {
+  tryoutName: string;
+  /** The org template's positions, in board order. */
+  positions: PositionOption[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
@@ -31,6 +39,7 @@ export function AddAthlete({ tryoutName }: { tryoutName: string }) {
       {open && (
         <AddSheet
           tryoutName={tryoutName}
+          positions={positions}
           onClose={() => setOpen(false)}
           onAdded={() => {
             setOpen(false);
@@ -44,18 +53,20 @@ export function AddAthlete({ tryoutName }: { tryoutName: string }) {
 
 function AddSheet({
   tryoutName,
+  positions,
   onClose,
   onAdded,
 }: {
   tryoutName: string;
+  positions: PositionOption[];
   onClose: () => void;
   onAdded: () => void;
 }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [jerseyNumber, setJerseyNumber] = useState("");
-  const [primaryPosition, setPrimary] = useState<PositionKey>(BOARD_ORDER[0]);
-  const [secondary, setSecondary] = useState<PositionKey[]>([]);
+  const [primaryPosition, setPrimary] = useState<string>(positions[0]?.code ?? "");
+  const [secondary, setSecondary] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -70,7 +81,7 @@ function AddSheet({
     };
   }, [onClose]);
 
-  function toggleSecondary(p: PositionKey) {
+  function toggleSecondary(p: string) {
     setSecondary((cur) =>
       cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p],
     );
@@ -178,15 +189,15 @@ function AddSheet({
         <select
           id="a-pos"
           value={primaryPosition}
-          onChange={(e) => setPrimary(e.target.value as PositionKey)}
+          onChange={(e) => setPrimary(e.target.value)}
           disabled={pending}
           className="min-h-tap mt-1 w-full rounded-md border border-border bg-input px-3
                      text-base text-foreground outline-none focus-visible:border-primary
                      disabled:opacity-50"
         >
-          {BOARD_ORDER.map((p) => (
-            <option key={p} value={p}>
-              {p} — {POSITIONS[p].label}
+          {positions.map((p) => (
+            <option key={p.code} value={p.code}>
+              {p.code} — {p.label}
             </option>
           ))}
         </select>
@@ -195,13 +206,13 @@ function AddSheet({
           Also trying out at (optional)
         </p>
         <div className="mt-1 flex flex-wrap gap-2">
-          {BOARD_ORDER.filter((p) => p !== primaryPosition).map((p) => {
-            const on = secondary.includes(p);
+          {positions.filter((p) => p.code !== primaryPosition).map((p) => {
+            const on = secondary.includes(p.code);
             return (
               <button
-                key={p}
+                key={p.code}
                 type="button"
-                onClick={() => toggleSecondary(p)}
+                onClick={() => toggleSecondary(p.code)}
                 aria-pressed={on}
                 disabled={pending}
                 className={
@@ -211,7 +222,7 @@ function AddSheet({
                     : "border border-border text-muted-foreground")
                 }
               >
-                {p}
+                {p.code}
               </button>
             );
           })}

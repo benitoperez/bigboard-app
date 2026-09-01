@@ -96,7 +96,15 @@ for (const [file, text] of source) {
   if (!/^\s*["']use client["']/m.test(text)) continue;
 
   // Every import statement, with its specifier.
-  for (const m of text.matchAll(/import\s+([\s\S]*?)\s+from\s+"(@\/[^"]+)"/g)) {
+  //
+  // The clause must not itself contain `from "`, or a lazy match starting at
+  // an earlier non-aliased import (`from "react"`) would run on until the
+  // next `@/` specifier and hand us a clause spanning several statements -
+  // which then looks like a value import even when the real statement was
+  // `import type`. That produced a false positive on a genuinely safe file.
+  for (const m of text.matchAll(
+    /import\s+((?:(?!from\s)[\s\S])*?)\s+from\s+"(@\/[^"]+)"/g,
+  )) {
     const clause = m[1];
     const spec = m[2];
 

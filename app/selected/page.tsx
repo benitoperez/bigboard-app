@@ -4,7 +4,7 @@ import { getProspects } from "@/lib/data/prospects";
 import { getActiveTryout } from "@/lib/data/tryouts";
 import { tryoutPeriod } from "@/lib/tryouts";
 import { getSelections } from "@/lib/data/selections";
-import { BOARD_ORDER, POSITIONS, type PositionKey } from "@/lib/config/positions";
+import { boardOrder } from "@/lib/template";
 import { ratingColor, formatRating } from "@/lib/rating-color";
 import { Avatar } from "@/components/avatar";
 import { SelectToggle } from "@/components/select-toggle";
@@ -22,19 +22,33 @@ export default async function SelectedPage() {
     );
   }
 
-  const [prospects, selections] = await Promise.all([
+  const [{ template, prospects }, selections] = await Promise.all([
     getProspects(tryout.id),
     getSelections(tryout.id),
   ]);
 
+  if (!template) {
+    return (
+      <main className="safe-top px-6 py-8">
+        <h1 className="text-4xl tracking-tight uppercase">Selected</h1>
+        <p className="mt-6 text-sm text-muted-foreground">
+          This tryout has no evaluation template.
+        </p>
+      </main>
+    );
+  }
+
   const selectedIds = new Set(selections.map((s) => s.prospectId));
   const selected = prospects.filter((p) => selectedIds.has(p.id));
 
-  // Segmented by PRIMARY position, in board order.
-  const byPosition = BOARD_ORDER.map((position) => ({
-    position,
-    rows: selected.filter((p) => p.primaryPosition === position),
-  })).filter((g) => g.rows.length > 0);
+  // Segmented by PRIMARY position, in the template's board order.
+  const byPosition = boardOrder(template)
+    .map((position) => ({
+      position: position.code,
+      label: position.label,
+      rows: selected.filter((p) => p.primaryPosition === position.code),
+    }))
+    .filter((g) => g.rows.length > 0);
 
   return (
     <main className="safe-top px-6 py-8">
@@ -78,11 +92,11 @@ export default async function SelectedPage() {
         </div>
       ) : (
         <div className="mt-6 space-y-6">
-          {byPosition.map(({ position, rows }) => (
+          {byPosition.map(({ position, label, rows }) => (
             <section key={position}>
               <div className="flex items-baseline justify-between">
                 <h2 className="text-sm font-bold tracking-wide text-primary uppercase">
-                  {POSITIONS[position as PositionKey].label}
+                  {label}
                 </h2>
                 <span className="tnum text-xs text-muted-foreground">
                   {rows.length}
