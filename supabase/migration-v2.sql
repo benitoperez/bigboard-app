@@ -93,11 +93,11 @@ $$ select role from memberships where org_id = p_org and user_id = auth.uid() $$
 
 create or replace function app.is_member(p_org uuid)
 returns boolean language sql stable security definer set search_path = public as
-$$ select app.org_role(p_org) is not null $$;
+$$ select p_org is not null and app.org_role(p_org) is not null $$;
 
 create or replace function app.is_evaluator(p_org uuid)
 returns boolean language sql stable security definer set search_path = public as
-$$ select app.org_role(p_org) in ('evaluator','admin','owner') $$;
+$$ select coalesce(app.org_role(p_org) in ('evaluator','admin','owner'), false) $$;
 
 create or replace function app.is_admin(p_org uuid)
 returns boolean language sql stable security definer set search_path = public as
@@ -115,6 +115,26 @@ $$
     join memberships b on b.org_id = a.org_id
     where a.user_id = auth.uid() and b.user_id = p_user
   )
+$$;
+
+/*
+ * The org id from a storage path's first segment, or null.
+ *
+ * The headshot policies authorize on this. A hard ::uuid cast would
+ * throw on any object whose name is not {uuid}/..., and an exception
+ * raised inside an RLS policy fails the whole query - so one file
+ * uploaded through the Supabase dashboard would break storage for
+ * every user. Returning null instead denies access to that one object
+ * and leaves the rest working.
+ */
+create or replace function app.path_org(p_name text)
+returns uuid language plpgsql immutable as
+$$
+begin
+  return split_part(p_name, '/', 1)::uuid;
+exception when others then
+  return null;
+end
 $$;
 
 create or replace function app.email_confirmed()
@@ -559,7 +579,10 @@ begin
 end
 $default_org$;
 
-alter table profiles drop column is_admin;
+-- NOTE: is_admin is NOT dropped here. Three v1 policies
+-- (delete_prospects, create_tryouts, update_tryouts) still reference
+-- it, and Postgres refuses to drop a column those depend on. It is
+-- dropped in section 12, immediately after every v1 policy is gone.
 
 -- ============================================================
 -- 10. org_id EVERYWHERE + backfill (SPEC-V2 §2.4, B6)
@@ -638,7 +661,20 @@ create trigger set_org before insert on comments      for each row execute funct
 
 -- Forty-specific range dies (B8); per-drill ranges live on
 -- template_drills, enforced in UI + server validation.
+-- The v1 views read drill_results.value, and Postgres refuses to alter
+-- the type of a column a view depends on. They are dropped here rather
+-- than in section 11 for that reason; section 11 recreates both in
+-- their v2 shape.
+drop view if exists prospect_speed;
+drop view if exists prospect_attribute_ratings;
+
+-- v1 typed this numeric(4,2) for a 40 time, which caps at 99.99. A
+-- baseball exit velocity reaches 130, so an insert would fail with a
+-- numeric field overflow. The old CHECK goes first, then the widening,
+-- then the v2 CHECK - altering the type under a `value < 20` constraint
+-- would leave the column able to hold values the constraint still bans.
 alter table drill_results drop constraint if exists drill_results_value_check;
+alter table drill_results alter column value type numeric(6,2);
 alter table drill_results add constraint drill_results_value_check check (value > 0);
 
 -- Storage paths gain an {org_id}/ prefix (B21), because the storage
@@ -755,6 +791,11 @@ begin
   end loop;
 end
 $drop_policies$;
+
+-- Safe only now that no policy references it. Three v1 policies did
+-- (delete_prospects, create_tryouts, update_tryouts); admin is a
+-- per-org role in v2, so the global flag has no meaning left.
+alter table profiles drop column is_admin;
 
 alter table orgs                enable row level security;
 alter table profiles            enable row level security;  -- already on from v1 (officers); harmless
@@ -913,18 +954,18 @@ create policy ai_usage_insert on ai_usage for insert to authenticated
 -- INSERT + SELECT + UPDATE together (v1 trap).
 create policy headshots_select on storage.objects for select to authenticated
   using (bucket_id = 'headshots'
-         and app.is_member((split_part(name, '/', 1))::uuid));
+         and app.is_member(app.path_org(name)));
 create policy headshots_insert on storage.objects for insert to authenticated
   with check (bucket_id = 'headshots'
-              and app.is_evaluator((split_part(name, '/', 1))::uuid));
+              and app.is_evaluator(app.path_org(name)));
 create policy headshots_update on storage.objects for update to authenticated
   using (bucket_id = 'headshots'
-         and app.is_evaluator((split_part(name, '/', 1))::uuid))
+         and app.is_evaluator(app.path_org(name)))
   with check (bucket_id = 'headshots'
-              and app.is_evaluator((split_part(name, '/', 1))::uuid));
+              and app.is_evaluator(app.path_org(name)));
 create policy headshots_delete on storage.objects for delete to authenticated
   using (bucket_id = 'headshots'
-         and app.is_evaluator((split_part(name, '/', 1))::uuid));
+         and app.is_evaluator(app.path_org(name)));
 
 -- ============================================================
 -- 13. RPCs (SPEC-V2 §2.6) — security definer, they trust nothing
@@ -1284,7 +1325,8 @@ grant execute on function
   app.is_admin(uuid),
   app.is_owner(uuid),
   app.shares_org_with(uuid),
-  app.email_confirmed()
+  app.email_confirmed(),
+  app.path_org(text)
 to authenticated;
 
 revoke all on function public.create_org(text, text)              from public, anon;
