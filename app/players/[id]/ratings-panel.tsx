@@ -74,6 +74,41 @@ export function RatingsPanel({
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Re-sync when the server sends a different attribute set.
+   *
+   * useState initializers run ONCE, on mount. Adding a position widens the
+   * attribute union, so the new sliders arrived with no entry in `draft` —
+   * and `value.toFixed(1)` on undefined threw during render, which is what
+   * put the whole profile behind "This page couldn't load". A reload looked
+   * like it fixed it only because a fresh mount re-ran the initializer.
+   *
+   * The server is the truth for what IS saved, so `persisted` is replaced
+   * wholesale. Unsaved edits survive: a slider the officer has moved keeps
+   * its draft, everything else re-reads from the server. Attributes that
+   * disappeared (a position removed) are dropped, so nothing pending can
+   * reference a key the template no longer has.
+   */
+  const [syncedTo, setSyncedTo] = useState(attributes);
+  if (syncedTo !== attributes) {
+    setSyncedTo(attributes);
+    setPersisted(Object.fromEntries(attributes.map((a) => [a.key, a.myValue])));
+    setDraft((d) =>
+      Object.fromEntries(
+        attributes.map((a) => [
+          a.key,
+          touched.has(a.key) && d[a.key] !== undefined
+            ? d[a.key]
+            : (a.myValue ?? DEFAULT_VALUE),
+        ]),
+      ),
+    );
+    setTouched((t) => {
+      const keys = new Set(attributes.map((a) => a.key));
+      return new Set([...t].filter((k) => keys.has(k)));
+    });
+  }
+
   const dirty = useMemo(
     () =>
       attributes
@@ -156,7 +191,7 @@ export function RatingsPanel({
           <Slider
             key={a.key}
             attribute={a}
-            value={draft[a.key]}
+            value={draft[a.key] ?? a.myValue ?? DEFAULT_VALUE}
             persisted={persisted[a.key]}
             isDirty={dirty.includes(a.key)}
             saving={status === "saving"}

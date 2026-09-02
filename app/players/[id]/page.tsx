@@ -292,11 +292,12 @@ function ordinal(n: number) {
  * wrong player, and naming the hole nudges officers toward filling it.
  */
 /**
- * How many tiles fit across a phone at this size. Once the real positions
- * plus the add control reach this, no placeholders are drawn and the control
- * simply wraps to the next line.
+ * How many tiles fit across a phone at this size WITHOUT wrapping. Five was
+ * one too many and pushed the row onto a second line. Once the real
+ * positions plus the add control reach this, no placeholders are drawn and
+ * the control simply wraps.
  */
-const ROW_TILES = 5;
+const ROW_TILES = 4;
 
 /**
  * An empty position slot.
