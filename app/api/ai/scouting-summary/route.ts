@@ -121,6 +121,7 @@ Write EXACTLY three sentences: one on strengths, one on concerns, one bottom-lin
 
 Rules:
 - Use ONLY the data below. Do not invent statistics, events, or observations.
+- WEIGH THE OFFICER COMMENTS HEAVILY. They are eyewitness notes from people who watched this athlete, and they carry things no rating captures: attitude, coachability, injuries, conditioning, whether a number is misleading. Where a comment and a rating disagree, say so rather than picking one silently.
 - If the data is thin, say so plainly (for example "limited data so far") instead of guessing.
 - Ratings are medians of officer opinions on a 0-10 scale. Position ratings are on a 45-99 scale where a missing rating means not enough evaluation yet, NOT a poor athlete.
 - Percentiles are within this tryout class only, never against an absolute standard.

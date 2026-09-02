@@ -202,11 +202,16 @@ function Kpi({
   emptyNote?: string;
 }) {
   return (
-    <div className="bb-card rounded-lg border border-border bg-card p-3">
-      <dt className="text-[11px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
+    <div className="bb-card rounded-lg border border-border bg-card p-3.5">
+      {/* The label is read BEFORE the number - a bare "4.51" tells you
+          nothing until you know what it measures - so it is white and set
+          at the same weight, not grey caption text under it. */}
+      <dt className="text-xs font-bold tracking-[0.12em] text-foreground uppercase">
         {label}
       </dt>
-      <dd className="tnum mt-1 text-2xl font-bold text-foreground">{value}</dd>
+      <dd className="tnum mt-1.5 text-3xl leading-none font-bold text-foreground">
+        {value}
+      </dd>
 
       {person ? (
         <dd>

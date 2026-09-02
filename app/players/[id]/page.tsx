@@ -2,12 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireOrg } from "@/lib/auth";
 import { getProspectDetail } from "@/lib/data/prospect-detail";
+import { getPositionRanks, type PositionRank } from "@/lib/data/prospects";
 import { getActiveTryout } from "@/lib/data/tryouts";
 import { getSelectedIds } from "@/lib/data/selections";
 import { getComments } from "@/lib/data/comments";
 import { Avatar, PositionChip } from "@/components/avatar";
 import { Dial } from "@/components/dial";
-import { RatingSlider } from "./rating-slider";
+import { RatingsPanel } from "./ratings-panel";
 import { AddPosition } from "./add-position";
 import { DrillEntry } from "./drill-entry";
 import { SelectToggle } from "@/components/select-toggle";
@@ -32,6 +33,10 @@ export default async function ProspectPage({
     getActiveTryout(),
     getComments(id),
   ]);
+
+  // Standing among everyone else at each position. Needs the whole class,
+  // so it cannot come from the single-prospect read.
+  const ranks = tryout ? await getPositionRanks(tryout.id) : new Map();
   const selectedIds = tryout ? await getSelectedIds(tryout.id) : new Set<string>();
 
   const [primaryRating, ...secondaryRatings] = p.positionRatings;
@@ -75,10 +80,14 @@ export default async function ProspectPage({
           </div>
 
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-3xl leading-tight tracking-tight uppercase">
-              {p.fullName}
+            {/* First and last on their own lines. A single truncated line
+                cut surnames off entirely - "Brandon ..." identifies nobody
+                on a roster where several share a first name. */}
+            <h1 className="text-2xl leading-tight tracking-tight break-words uppercase">
+              <span className="block">{p.firstName}</span>
+              <span className="block">{p.lastName}</span>
             </h1>
-            <div className="mt-2 flex flex-wrap items-center gap-1">
+            <div className="mt-3 flex flex-wrap items-center gap-1">
               <PositionChip
                 position={p.primaryPosition}
                 label={primaryRating.label}
@@ -96,16 +105,48 @@ export default async function ProspectPage({
 
           <PositionScore
             code={primaryRating.position}
+            label={primaryRating.label}
             rating={primaryRating.rating.rating}
             inputs={primaryRating.rating.inputs}
             covered={primaryRating.rating.covered}
             required={primaryRating.rating.required}
             missing={primaryRating.missing}
+            rank={ranks.get(primaryRating.position)?.get(p.id) ?? null}
             primary
           />
         </div>
 
-        {/* Row 2: the team-list toggle, full width and horizontal, in the
+        {/* Secondary positions and the add control, aligned as one
+            row of equal-height tiles. */}
+        {(secondaryRatings.length > 0 || is_evaluator) && (
+          <div className="mt-4 flex flex-wrap items-start gap-3">
+            {secondaryRatings.map((r) => (
+              <PositionScore
+                key={r.position}
+                code={r.position}
+                label={r.label}
+                rating={r.rating.rating}
+                inputs={r.rating.inputs}
+                covered={r.rating.covered}
+                required={r.rating.required}
+                missing={r.missing}
+                rank={ranks.get(r.position)?.get(p.id) ?? null}
+              />
+            ))}
+            {is_evaluator && (
+              <AddPosition
+                prospectId={p.id}
+                taken={[p.primaryPosition, ...p.secondaryPositions]}
+                positions={template.positions
+                  .slice()
+                  .sort((a, b) => a.sortOrder - b.sortOrder)
+                  .map((tp) => ({ code: tp.code, label: tp.label }))}
+              />
+            )}
+          </div>
+        )}
+
+        {/* The team-list toggle, full width and horizontal, in the
             slot the "Replace photo" bar used to occupy. It is the one
             decision an officer makes from this header, so it gets a row of
             its own rather than being tucked beside the name. */}
@@ -127,34 +168,6 @@ export default async function ProspectPage({
                   : "Tap to add them for the whole staff"}
               </span>
             </span>
-          </div>
-        )}
-
-        {/* Row 3: secondary positions and the add control, aligned as one
-            row of equal-height tiles. */}
-        {(secondaryRatings.length > 0 || is_evaluator) && (
-          <div className="mt-4 flex flex-wrap items-start gap-3">
-            {secondaryRatings.map((r) => (
-              <PositionScore
-                key={r.position}
-                code={r.position}
-                rating={r.rating.rating}
-                inputs={r.rating.inputs}
-                covered={r.rating.covered}
-                required={r.rating.required}
-                missing={r.missing}
-              />
-            ))}
-            {is_evaluator && (
-              <AddPosition
-                prospectId={p.id}
-                taken={[p.primaryPosition, ...p.secondaryPositions]}
-                positions={template.positions
-                  .slice()
-                  .sort((a, b) => a.sortOrder - b.sortOrder)
-                  .map((tp) => ({ code: tp.code, label: tp.label }))}
-              />
-            )}
           </div>
         )}
 
@@ -211,19 +224,15 @@ export default async function ProspectPage({
         <p className="mt-1 text-xs text-muted-foreground">
           Every attribute across {p.positionRatings.length}{" "}
           {p.positionRatings.length === 1 ? "position" : "positions"}. Shared
-          attributes are rated once and count toward each.
+          attributes are rated once and count toward each. Nothing saves
+          until you say so.
         </p>
 
-        <div className="mt-2 bb-card rounded-lg border border-border bg-card px-4">
-          {p.attributes.map((a) => (
-            <RatingSlider
-              key={a.key}
-              attribute={a}
-              prospectId={p.id}
-              officerId={profile!.id}
-            />
-          ))}
-        </div>
+        <RatingsPanel
+          attributes={p.attributes}
+          prospectId={p.id}
+          officerId={profile!.id}
+        />
       </section>
       )}
 
@@ -272,32 +281,57 @@ function ordinal(n: number) {
  */
 function PositionScore({
   code,
+  label,
   rating,
   inputs,
   covered,
   required,
   missing,
+  rank = null,
   primary = false,
 }: {
   code: string;
+  label?: string;
   rating: number | null;
   inputs: number;
   covered: number;
   required: number;
   missing: string[];
+  rank?: PositionRank | null;
   primary?: boolean;
 }) {
   return (
     <div className="shrink-0 text-center">
       <Dial rating={rating} size={primary ? "lg" : "md"} label={code} />
+
+      {/* Standing first, input count demoted beneath it. "84" says how good;
+          "#2 of 11" says whether that survives a cut, which is the question
+          a board is being read to answer. */}
       {rating === null ? (
         <p className="tnum text-[11px] text-muted-foreground">
           {covered} of {required}
         </p>
       ) : (
-        <p className="tnum text-[11px] text-muted-foreground">
-          {inputs} {inputs === 1 ? "input" : "inputs"}
-        </p>
+        <>
+          {rank && (
+            <p
+              className={
+                "tnum font-bold text-foreground " +
+                (primary ? "text-sm" : "text-[11px]")
+              }
+            >
+              #{rank.rank}
+              <span className="font-normal text-muted-foreground">
+                {" "}
+                of {rank.of}
+                {primary && label ? ` ${label}s` : ""}
+              </span>
+            </p>
+          )}
+          <p className="tnum text-[11px] text-muted-foreground">
+            ({inputs} {inputs === 1 ? "input" : "inputs"})
+          </p>
+        </>
       )}
       {rating === null && missing.length > 0 && primary && (
         <p className="mx-auto mt-1 max-w-[10rem] text-[11px] leading-tight text-muted-foreground">

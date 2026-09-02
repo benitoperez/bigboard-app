@@ -11,34 +11,48 @@ the spec does not.
 Mobile web app for running flag football tryouts. Officers rate prospects from
 their phones on the field; the app turns ratings into positional boards.
 
-## 1. SPEC.md is the source of truth
+## 1. SPEC-V2.md is the source of truth
 
-`SPEC.md` governs all schema, logic, positions, attributes, weights, formulas,
-and functionality. Read the relevant section before implementing. If the code
-and the spec disagree, the spec wins — or the spec gets updated deliberately,
-never silently.
+`SPEC-V2.md` governs v2: multi-tenancy, roles, DB templates, onboarding, AI,
+lifecycle. `SPEC.md` is the v1 document and stays useful for the rating math,
+the gating rule and the field-usability reasoning it explains at length —
+where the two disagree, **v2 wins**.
 
-## 2. `lib/config/positions.ts` is the only place positions live
+Read the relevant section before implementing. If the code and the spec
+disagree, the spec wins — or the spec gets updated deliberately, never
+silently.
 
-Positions, attributes, and weights may be defined in exactly one file:
-`lib/config/positions.ts`. Every screen imports from it.
+## 2. The database template is the only place positions live
 
-**If a position code, attribute key, label, or weight appears in any other
-file, that is a bug — fix it immediately.** This includes SQL, seed data,
-test fixtures, and comments that enumerate positions.
+**Changed in v2.** `lib/config/positions.ts` is DELETED. Positions,
+attributes, drills and weights are org-owned rows, loaded through
+`lib/data/template.ts` and shaped by `lib/template.ts`.
 
-The weights stay in TypeScript, never in SQL. SQL does window functions,
-TypeScript does the weighting. Two sources of truth for weights is the
-failure this rule exists to prevent.
+**If a position code, attribute key, drill key or weight is written out
+anywhere except the seed blocks in `supabase/migration-v2.sql`, that is a
+bug — fix it immediately.** That includes fixtures, comments that enumerate
+positions, and "helpful" fallbacks.
 
-## 3. Sliders save on release only
+The rule survives its own move: weights still live in exactly one place, and
+they are still applied in TypeScript. SQL does the window functions
+(medians, percentiles); `computePositionRating` does the weighting.
 
-Save on pointer release. Never on drag, never on change, never on an interval
-during interaction. Upsert on `(prospect_id, officer_id, attribute_key)`.
+`scripts/seed-templates.ts` PARSES the migration rather than restating it,
+for this reason. Do not replace it with a hand-written copy.
 
-Firing saves during drag lets an older request resolve after a newer one and
-overwrite the correct value with a stale one. Apply the new value to local
-state immediately, then sync. Never block the UI on the network.
+## 3. Sliders never save by themselves
+
+**Changed in v2.** v1 saved on pointer release; the form now saves only when
+the officer presses Save — per attribute, or all pending at once. Upsert on
+`(prospect_id, officer_id, attribute_key)`.
+
+What has NOT changed is the reason the original rule existed: **a drag must
+never touch the network.** Firing saves during drag lets an older request
+resolve after a newer one and overwrite a correct value with a stale one,
+silently. Explicit save is strictly safer than save-on-release, because
+nothing is ever in flight to be superseded.
+
+`onChange` updates local state only. Never block the UI on the network.
 
 ## 4. Never animate the slider drag with framer-motion
 
@@ -80,19 +94,33 @@ Used outdoors in direct sunlight, one-handed, often gloved.
 Remote is `benitoperez/Player-Eval-Project` on `main`.
 
 **Commit with a clear message and push after completing each numbered build
-step** from SPEC.md section 15. One commit per step, not per file.
+step** from SPEC-V2.md section 10. One commit per step, not per file.
+
+`main` is deployed. Tags: `v1.0` is the pre-multi-tenancy app, `v2.0` is the
+first multi-tenant release.
+
+**Migrations are append-only.** `migration.sql` and `migration-v2.sql` have
+both run against the live database and must never be edited. A schema change
+is a new numbered file.
 
 ## Verify these by hand — generated code is not trustworthy here
 
 Per SPEC.md section 16:
 
-- **RLS policies** — test with two accounts in separate browser profiles
-- **Slider save race** — confirm saves fire on release only
+- **RLS policies** — test with two accounts in separate browser profiles.
+  In v2 this also means two ORGS: org A must never read org B
+- **Cross-org scoping** — RLS admits every org a user belongs to, so a query
+  that forgets `.eq("org_id", activeOrg.orgId)` silently mixes clubs for
+  anyone in two of them. This has already happened once, in `tryouts`
+- **Slider saves** — confirm a drag writes nothing at all
 - **`computePositionRating`** — verify the weighting by hand with fake data;
   wrong weights throw no error, the numbers are just quietly wrong
-- **`percent_rank` null handling** in `prospect_speed` — confirm untimed
-  prospects are excluded from the window, not ranked as slowest
-- **Config drift** — grep for position codes outside `positions.ts`
+- **`percent_rank` null handling** in `prospect_drill_stats` — confirm
+  unmeasured prospects are excluded from the window, not ranked last, and
+  that `direction` orders each drill the right way round
+- **Config drift** — `npm run verify:templates`
+- **Renamed tables** — PostgREST resolves table names at RUNTIME, so a stale
+  one fails in production and nowhere else. `npm run verify:imports` checks
 
 ## Gating rule
 

@@ -52,7 +52,7 @@ export function BoardView({
       <div className="mt-4">
         <label
           htmlFor="board-sort"
-          className="text-[11px] font-semibold tracking-[0.15em] text-muted-foreground uppercase"
+          className="text-xs font-bold tracking-[0.12em] text-foreground uppercase"
         >
           Sort by
         </label>
@@ -60,9 +60,10 @@ export function BoardView({
           id="board-sort"
           value={sortKey}
           onChange={(e) => setSortKey(e.target.value)}
-          className="min-h-tap mt-1 w-full rounded-md border border-border bg-input px-3
-                     text-base text-foreground outline-none focus-visible:border-primary
-                     focus-visible:ring-2 focus-visible:ring-ring/40"
+          className="min-h-tap mt-1.5 w-full rounded-md border border-border bg-input px-3
+                     text-base font-semibold text-foreground outline-none
+                     focus-visible:border-primary focus-visible:ring-2
+                     focus-visible:ring-ring/40"
         >
           {groupBy(options).map(([group, opts]) => (
             <optgroup key={group} label={group}>

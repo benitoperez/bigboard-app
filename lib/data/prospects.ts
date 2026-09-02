@@ -3,6 +3,7 @@ import { signHeadshots } from "@/lib/data/storage";
 import { getTemplateForTryout } from "@/lib/data/template";
 import { isPositionCode, type Template } from "@/lib/template";
 import {
+  compareForBoard,
   computePositionRating,
   missingComponents,
   type AttributeRatings,
@@ -204,4 +205,57 @@ export async function getProspects(tryoutId: string): Promise<ProspectsResult> {
   });
 
   return { template, prospects: rows };
+}
+
+/**
+ * Where each prospect stands at each position they play.
+ *
+ * "84" answers how good; "#2 of 11 quarterbacks" answers whether that is a
+ * cut — and on a board where the whole point is ranking, the second question
+ * is the one an officer is actually holding. It needs the rest of the class,
+ * which a single-prospect read cannot know, so it is computed here.
+ *
+ * Only RATED prospects are ranked. A gated prospect has no meaningful place
+ * in an order (SPEC.md section 8), and giving them one would present a
+ * barely-evaluated athlete as beaten by name rather than by evidence.
+ */
+export type PositionRank = {
+  /** 1-based place among rated prospects at this position. */
+  rank: number;
+  /** How many prospects at this position have a rating at all. */
+  of: number;
+};
+
+export async function getPositionRanks(
+  tryoutId: string,
+): Promise<Map<string, Map<string, PositionRank>>> {
+  const { template, prospects } = await getProspects(tryoutId);
+  const ranks = new Map<string, Map<string, PositionRank>>();
+  if (!template) return ranks;
+
+  for (const position of template.positions) {
+    const rated = prospects
+      .filter((p) => p.ratingsByPosition[position.code]?.rating !== null)
+      .filter((p) => p.playedPositions.includes(position.code))
+      .sort((a, b) =>
+        compareForBoard(
+          {
+            raw: a.ratingsByPosition[position.code]!.raw,
+            jerseyNumber: a.jerseyNumber,
+          },
+          {
+            raw: b.ratingsByPosition[position.code]!.raw,
+            jerseyNumber: b.jerseyNumber,
+          },
+        ),
+      );
+
+    const byProspect = new Map<string, PositionRank>();
+    rated.forEach((p, i) => {
+      byProspect.set(p.id, { rank: i + 1, of: rated.length });
+    });
+    ranks.set(position.code, byProspect);
+  }
+
+  return ranks;
 }
