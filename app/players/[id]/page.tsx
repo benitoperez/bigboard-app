@@ -9,7 +9,7 @@ import { getComments } from "@/lib/data/comments";
 import { Avatar, PositionChip } from "@/components/avatar";
 import { Dial } from "@/components/dial";
 import { RatingsPanel } from "./ratings-panel";
-import { AddPosition } from "./add-position";
+import { PositionEditor } from "./position-editor";
 import { DrillEntry } from "./drill-entry";
 import { SelectToggle } from "@/components/select-toggle";
 import { Comments } from "./comments";
@@ -116,35 +116,47 @@ export default async function ProspectPage({
           />
         </div>
 
-        {/* Secondary positions and the add control, aligned as one
-            row of equal-height tiles. */}
-        {(secondaryRatings.length > 0 || is_evaluator) && (
-          <div className="mt-4 flex flex-wrap items-start gap-3">
-            {secondaryRatings.map((r) => (
-              <PositionScore
-                key={r.position}
-                code={r.position}
-                label={r.label}
-                rating={r.rating.rating}
-                inputs={r.rating.inputs}
-                covered={r.rating.covered}
-                required={r.rating.required}
-                missing={r.missing}
-                rank={ranks.get(r.position)?.get(p.id) ?? null}
-              />
-            ))}
-            {is_evaluator && (
-              <AddPosition
-                prospectId={p.id}
-                taken={[p.primaryPosition, ...p.secondaryPositions]}
-                positions={template.positions
-                  .slice()
-                  .sort((a, b) => a.sortOrder - b.sortOrder)
-                  .map((tp) => ({ code: tp.code, label: tp.label }))}
-              />
+        {/* Secondary positions, the add/remove control, and faint
+            placeholders for the slots still open.
+
+            The placeholders are the same dial and caption at low opacity,
+            not a different shape: on an athlete with one position the row
+            was a lone button with nothing to explain it, and an empty row
+            teaches nothing about what belongs there. They fill the row to
+            five and disappear as real positions take their places. */}
+        <div className="mt-4 flex flex-wrap items-start gap-3">
+          {secondaryRatings.map((r) => (
+            <PositionScore
+              key={r.position}
+              code={r.position}
+              label={r.label}
+              rating={r.rating.rating}
+              inputs={r.rating.inputs}
+              covered={r.rating.covered}
+              required={r.rating.required}
+              missing={r.missing}
+              rank={ranks.get(r.position)?.get(p.id) ?? null}
+            />
+          ))}
+
+          {is_evaluator && (
+            <PositionEditor
+              prospectId={p.id}
+              primary={p.primaryPosition}
+              secondary={p.secondaryPositions}
+              positions={template.positions
+                .slice()
+                .sort((a, b) => a.sortOrder - b.sortOrder)
+                .map((tp) => ({ code: tp.code, label: tp.label }))}
+            />
+          )}
+
+          {is_evaluator &&
+            Array.from(
+              { length: Math.max(0, ROW_TILES - secondaryRatings.length - 1) },
+              (_, i) => <PositionPlaceholder key={i} />,
             )}
-          </div>
-        )}
+        </div>
 
         {/* The team-list toggle, full width and horizontal, in the
             slot the "Replace photo" bar used to occupy. It is the one
@@ -279,6 +291,30 @@ function ordinal(n: number) {
  * instead of a number. A barely-rated 91 above a fully-vetted 84 cuts the
  * wrong player, and naming the hole nudges officers toward filling it.
  */
+/**
+ * How many tiles fit across a phone at this size. Once the real positions
+ * plus the add control reach this, no placeholders are drawn and the control
+ * simply wraps to the next line.
+ */
+const ROW_TILES = 5;
+
+/**
+ * An empty position slot.
+ *
+ * Deliberately the SAME dial and caption as a real one, just faded - a
+ * different shape would read as a control rather than as "another position
+ * could go here". The caption says POS instead of a position name because
+ * inventing one would suggest the app expects that specific position.
+ */
+function PositionPlaceholder() {
+  return (
+    <div className="shrink-0 text-center opacity-30" aria-hidden="true">
+      <Dial rating={null} size="md" label="POS" />
+      <p className="tnum text-[11px] text-muted-foreground">&mdash;</p>
+    </div>
+  );
+}
+
 function PositionScore({
   code,
   label,
