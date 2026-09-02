@@ -1,12 +1,12 @@
 # Big Board
 
-Big Board is a tryout management and evaluation platform for organized sports programs: club, travel, youth and AAU teams. Evaluators rate athletes from their phones on the field, and the app consolidates every input into live ranked boards by position. It imports rosters from a spreadsheet, a photo, a screenshot or pasted text, and writes short AI scouting summaries from the data already collected. It was built for teams that run tryouts on a clipboard today, and is in production with roughly 40 active users.
+Big Board is a tryout management and evaluation platform for organized sports programs: club, travel, youth and AAU teams. Evaluators rate athletes from their phones on the field, and the app consolidates every input into live ranked boards by position. It imports rosters from a spreadsheet, a photo or pasted text, and writes short AI scouting summaries from the data already collected. It was built for teams that run tryouts on a clipboard today, and is in production with roughly 40 active users.
 
 ## The problem
 
-Tryouts get run on clipboards and shared spreadsheets. Fifteen evaluators score a hundred or more athletes at once, on a field, on their phones, with no live consolidation. Some evaluators see certain athletes far more than others, and nobody can tell which scores rest on one look and which rest on ten. Cut decisions end up driven by whoever speaks loudest rather than by the data.
+Tryouts get run on clipboards and shared spreadsheets. Fifteen evaluators score a hundred or more athletes at once, on a field, with no live consolidation. Some evaluators see certain athletes far more than others, and nobody can tell which scores rest on one look and which on ten. Cut decisions end up driven by whoever speaks loudest rather than by the data.
 
-Existing tools such as Hudl, TeamSnap and the recruiting platforms are built and priced for funded programs with dedicated staff. Nothing serves a self-organized club running a two-hour tryout on no budget. That is the gap this fills.
+Tools such as Hudl, TeamSnap and the recruiting platforms are built and priced for funded programs with dedicated staff. Nothing serves a self-organized club running a two-hour tryout on no budget. That is the gap this fills.
 
 ## How it works
 
@@ -14,7 +14,7 @@ Each position has a set of weighted attributes. Any evaluator rates an athlete 0
 
 The team rating for an attribute is the median across evaluators, not the mean, so one evaluator who rates everything a 9 cannot swing a prospect.
 
-Measured drills such as the 40-yard dash become a percentile within the tryout class rather than a score on an absolute scale, so ratings calibrate to the talent actually present. Each drill declares whether lower or higher is better, so sprint times and exit velocities both rank correctly.
+Measured drills such as the 40-yard dash become a percentile within the tryout class rather than a score on an absolute scale, so ratings calibrate to the talent actually present. Each drill declares whether lower or higher is better.
 
 Ratings are gated behind minimum coverage. A position rating appears only when every weighted input has data and enough evaluators have contributed. Until then the athlete shows progress, such as "4 of 6 inputs, missing route running", instead of a number. A barely-rated 91 above a fully-vetted 84 gets the wrong athlete cut, and showing the gap points evaluators at the athletes nobody has looked at.
 
@@ -27,18 +27,18 @@ Boards are ranked by position rather than as one master list, because teams recr
 - Selected, a shared shortlist for cut meetings, grouped by position with a sort per group.
 - Roster import from CSV or Excel, a photo or screenshot, or pasted text. Every path lands in the same editable review table.
 - AI scouting summaries from an athlete's ratings, drill results and evaluator notes.
-- CSV export with every drill attempt, position rating and attribute median, with columns generated from the template.
+- CSV export of every drill attempt, position rating and attribute median, with columns generated from the template.
 - Every evaluator writes to one shared record. Screens re-read after each save, so a board reflects everyone's input with no merge step.
 
 ## AI integration
 
 Gemini Flash handles roster extraction and scouting summaries. The engineering around it matters more than the model.
 
-The API key is server-side only and never carries a public prefix. The browser only calls the app's own authenticated routes, each of which verifies that the caller is a confirmed member of the organization at a sufficient role before anything leaves for Google. A build-time check fails if the key is referenced from any client component.
+The API key is server-side only and never carries a public prefix. The browser only calls the app's own authenticated routes, each of which verifies the caller is a confirmed member of the organization at a sufficient role before anything leaves for Google. A build-time check fails if the key is referenced from any client component.
 
 Every route enforces a per-user and a global daily cap, counted in an ai_usage table. Failed calls do not consume quota.
 
-AI output never writes directly to the database. Roster extraction is told to return null for anything it cannot read confidently, and its output lands in an editable review table where flagged fields are highlighted and jersey collisions are decided row by row. A hallucinated 40 time is worse than a blank field: the blank gets fixed, and the plausible wrong value gets imported.
+AI output never writes directly to the database. Roster extraction is told to return null for anything it cannot read confidently, and its output lands in an editable review table where flagged fields are highlighted and jersey collisions are decided row by row. A hallucinated 40 time is worse than a blank field: the blank gets fixed, the plausible wrong value gets imported.
 
 ## Tech stack
 
