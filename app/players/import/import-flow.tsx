@@ -271,7 +271,8 @@ export function ImportFlow({
             Upload a photo or screenshot
           </span>
           <span className="text-xs text-muted-foreground">
-            AI reads it. JPG, PNG or HEIC — several pages at once.
+            AI reads it. Camera or library, JPG, PNG or HEIC, several pages
+            at once.
           </span>
         </button>
 
@@ -386,9 +387,9 @@ function PhotoStep({
     <div>
       <p className="text-sm font-semibold text-foreground">Roster photos</p>
       <p className="mt-1 text-xs text-muted-foreground">
-        A printed sheet, a whiteboard, a screenshot. Add one image per page.
-        Anything the AI cannot read confidently is left blank and flagged, not
-        guessed.
+        A printed sheet, a whiteboard, a screenshot. Take them now or pick
+        them from your library, one image per page. Anything the AI cannot
+        read confidently is left blank and flagged, not guessed.
       </p>
 
       {images.length > 0 && (

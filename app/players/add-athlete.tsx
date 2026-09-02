@@ -365,7 +365,6 @@ function AddSheet({
               ref={photoInput}
               type="file"
               accept="image/*"
-              capture="environment"
               onChange={choosePhoto}
               disabled={pending}
               className="sr-only"

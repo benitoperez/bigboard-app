@@ -14,10 +14,17 @@ import { setHeadshotPath, removeHeadshot } from "./headshot-actions";
 /**
  * Headshot capture - SPEC.md section 13.
  *
- * capture="environment" opens the rear camera directly on a phone, which is
- * the only workable flow standing on a field. The file is resized in the
- * browser BEFORE upload, so a 4MB iPhone photo becomes tens of kilobytes and
- * field wifi is not asked to carry the original.
+ * NO `capture` attribute, deliberately. v1 set capture="environment" to open
+ * the rear camera straight away, which is the fastest path standing on a
+ * field - but it also SKIPS the photo library entirely, so a headshot taken
+ * earlier in the day, or shot on someone else's phone and sent over, could
+ * not be used at all. Without it the OS offers both, at the cost of one
+ * extra tap on the camera path.
+ *
+ * The file is resized in the browser BEFORE upload, so a 4MB iPhone photo
+ * becomes tens of kilobytes and field wifi is not asked to carry the
+ * original. That matters more for a library photo than a fresh capture,
+ * since an old one may be full resolution.
  *
  * Optional throughout: nothing blocks on a photo existing, and the default
  * jersey-number circle stands in wherever one is missing.
@@ -110,7 +117,11 @@ export function HeadshotUpload({
         row of a phone header on it.
       */}
       <label
-        aria-label={hasHeadshot ? "Replace photo" : "Add photo"}
+        aria-label={
+          hasHeadshot
+            ? "Replace photo — take one or choose from your library"
+            : "Add photo — take one or choose from your library"
+        }
         title={hasHeadshot ? "Replace photo" : "Add photo"}
         className={
           "bb-card absolute -right-1 -bottom-1 flex h-8 w-8 cursor-pointer items-center " +
@@ -122,7 +133,6 @@ export function HeadshotUpload({
           ref={inputRef}
           type="file"
           accept="image/*"
-          capture="environment"
           onChange={onFile}
           disabled={busy}
           className="sr-only"
