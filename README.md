@@ -1,6 +1,8 @@
 # Big Board
 
-Big Board is a tryout management and evaluation platform for organized sports programs: club, travel, youth and AAU teams. Evaluators rate athletes from their phones on the field, and the app consolidates every input into live ranked boards by position. It imports rosters from spreadsheets, photos or pasted text and writes short AI scouting summaries from the data already collected. It was built for teams that run tryouts on a clipboard, and is in production with roughly 40 active users.
+Big Board is a full stack tryout management and evaluation platform, designed to operate tryouts/recruiting for organized sports programs: club, varsity, travel, youth and AAU teams. Created as an alternative solution to sluggish, expensive, and outdated methods or systems such as clipboards, excel, or other commonly out of scope softwares.
+
+Evaluators rate athletes all from their phones on the field, and the app consolidates every input into live ranked boards by position. It imports rosters from spreadsheets, AI parsing/OCR, or pasted text. The eval system is intuitive to understand and the AI scout creates summaries from the data and notes already collected. Created as the VP of NCSU Club Flag Football team as an idea to streamline, coordinate, and manage tryouts efficiently and accurately and already has over roughly 40 active users
 
 ## The problem
 
