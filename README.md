@@ -18,7 +18,7 @@ The team rating for an attribute is the median across evaluators, not the mean, 
 
 Measured drills such as the 40-yard dash become a percentile within the tryout class rather than a score on an absolute scale, so ratings calibrate to the talent actually present.
 
-Ratings are gated behind minimum coverage. A position rating appears only when every weighted input has data and enough evaluators have contributed. Until then the athlete shows progress, such as "4 of 6 inputs, missing route running", instead of a number. A barely-rated 91 above a fully-vetted 84 gets the wrong athlete cut.
+Ratings are gated behind minimum coverage. A position rating appears only when every weighted input has data and enough evaluators have contributed. Until then the athlete shows progress, such as "4 of 6 inputs, missing route running", instead of a number. A barely rated 91 getting put above a fully vetted 84 is counter intuitive and can get the wrong person cut.
 
 Boards are ranked by position rather than as one master list, because teams recruit for specific needs.
 
