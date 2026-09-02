@@ -15,15 +15,21 @@ import { Avatar, PositionChip } from "@/components/avatar";
 import { Dial } from "@/components/dial";
 
 /**
- * The dashboard body: position boards, or one flat list sorted by a single
- * measure.
+ * The dashboard body: one flat ranked list, or position boards.
  *
- * Position boards stay the default because officers are hunting specific
- * positions and a single "best overall" list is the wrong primary view
- * (SPEC.md section 10.1). But once you want to know who ran fastest, or who
- * grades highest on one attribute, segmenting by position is exactly what
- * gets in the way — so the sort is a deliberate detour, not a replacement.
+ * **Overall rating is the default**, which deliberately departs from SPEC.md
+ * section 10.1 — that argued position boards should be primary, because
+ * officers hunt specific positions and a single "best overall" list is the
+ * wrong first view. In use it turned out the other way round: the first
+ * question at a tryout is who is best, and the boards are the detour taken
+ * once you are hunting a particular spot. Both are one tap apart either way.
+ *
+ * Position boards are still the RIGHT tool for cut decisions, so nothing was
+ * removed — only the order the two are offered in.
  */
+
+/** Overall rating, highest first. See the note above about SPEC §10.1. */
+const DEFAULT_SORT = "rating";
 
 type SortOption = {
   value: string;
@@ -43,7 +49,7 @@ export function BoardView({
   prospects: ProspectRow[];
 }) {
   const options = useMemo(() => buildOptions(template), [template]);
-  const [sortKey, setSortKey] = useState("boards");
+  const [sortKey, setSortKey] = useState(DEFAULT_SORT);
 
   const active = options.find((o) => o.value === sortKey) ?? options[0];
 
@@ -303,24 +309,24 @@ function byValue(
 function buildOptions(template: Template): SortOption[] {
   const options: SortOption[] = [
     {
-      value: "boards",
-      label: "Position boards",
-      group: "Default",
-      sort: null,
-      readout: null,
-    },
-    {
-      // Primary-position rating, on RAW so the display band's collisions do
-      // not present real gaps as ties (SPEC.md section 8).
+      // Primary-position rating, sorted on RAW so the display band's
+      // collisions do not present real gaps as ties (SPEC.md section 8).
       value: "rating",
       label: "Overall rating — highest first",
-      group: "Rating",
+      group: "Everyone",
       sort: (a, b) =>
         compareForBoard(
           { raw: a.primary.raw, jerseyNumber: a.jerseyNumber },
           { raw: b.primary.raw, jerseyNumber: b.jerseyNumber },
         ),
       readout: (p) => (p.primary.rating === null ? null : String(p.primary.rating)),
+    },
+    {
+      value: "boards",
+      label: "Position boards",
+      group: "Everyone",
+      sort: null,
+      readout: null,
     },
   ];
 

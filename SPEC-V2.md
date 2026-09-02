@@ -43,6 +43,7 @@ This is the consolidated list; nothing breaks that is not on it.
 | B19 | `verify:rating` and `seed:dev` read `positions.ts` at runtime | They read the seed definitions / DB template instead |
 | B20 | KPI strip hardcodes "fastest 40" (SPEC §10.1) | KPI shows best result per measured drill, direction-aware |
 | B21 | Headshot storage path is `{prospect_id}` scoped only by bucket (HANDOFF §5) | Paths become `{org_id}/{prospect_id}…`; storage policies check org membership on the path's first segment |
+| B24 | Position boards are the dashboard's primary view (SPEC §10.1) | Overall rating, highest first, is the default sort. Boards are one tap away and unchanged — only the order they are offered in moved |
 | B23 | CSV import is admin-only (SPEC §12) | Import is evaluator+; export is the admin-gated direction instead (§10b.1) |
 | B22 | CLAUDE.md rules 1, 2, 6, 8 as written | Need rewriting when v2 merges (see §12). Until merge, this spec is the flag that rule 6 (never touch RLS silently) demands |
 
