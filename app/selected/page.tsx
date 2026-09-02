@@ -6,12 +6,9 @@ import { getActiveTryout } from "@/lib/data/tryouts";
 import { tryoutPeriod } from "@/lib/tryouts";
 import { getSelections } from "@/lib/data/selections";
 import { boardOrder } from "@/lib/template";
-import { compareForBoard } from "@/lib/ratings";
 import { NoTryout } from "@/components/no-tryout";
 import { ExportButton } from "@/app/account/export-button";
-import { ratingColor, formatRating } from "@/lib/rating-color";
-import { Avatar } from "@/components/avatar";
-import { SelectToggle } from "@/components/select-toggle";
+import { PositionGroup } from "./position-group";
 
 export const metadata: Metadata = { title: "Selected - Big Board" };
 
@@ -45,28 +42,20 @@ export default async function SelectedPage() {
   }
 
   const selectedIds = new Set(selections.map((s) => s.prospectId));
+  const addedBy = Object.fromEntries(
+    selections.map((s) => [s.prospectId, s.selectedByName ?? "an officer"]),
+  );
   const selected = prospects.filter((p) => selectedIds.has(p.id));
 
-  // Segmented by PRIMARY position in the template's board order, and within
-  // each group ranked by overall rating rather than jersey number.
-  //
-  // Sorted on RAW, never the 45-99 display band: the band compresses real
-  // gaps, so two athletes can share a display number while one is genuinely
-  // ahead, and sorting on it would present that as a tie (SPEC.md §8).
-  // Gated athletes fall to the bottom of their own group rather than being
-  // hidden - they are on the team list, so hiding them here would lose them.
+  // Segmented by PRIMARY position in the template's board order. Ordering
+  // WITHIN a group is the group's own business - each one carries its own
+  // sort control, defaulting to overall rating.
   const byPosition = boardOrder(template)
     .map((position) => ({
       position: position.code,
       label: position.label,
-      rows: selected
-        .filter((p) => p.primaryPosition === position.code)
-        .sort((a, b) =>
-          compareForBoard(
-            { raw: a.primary.raw, jerseyNumber: a.jerseyNumber },
-            { raw: b.primary.raw, jerseyNumber: b.jerseyNumber },
-          ),
-        ),
+      components: position.components,
+      rows: selected.filter((p) => p.primaryPosition === position.code),
     }))
     .filter((g) => g.rows.length > 0);
 
@@ -124,61 +113,15 @@ export default async function SelectedPage() {
         </div>
       ) : (
         <div className="mt-6 space-y-6">
-          {byPosition.map(({ position, label, rows }) => (
-            <section key={position}>
-              <div className="flex items-baseline justify-between">
-                <h2 className="text-sm font-bold tracking-wide text-primary uppercase">
-                  {label}
-                </h2>
-                <span className="tnum text-xs text-muted-foreground">
-                  {rows.length}
-                </span>
-              </div>
-
-              <ul className="mt-2 divide-y divide-border overflow-hidden bb-card rounded-lg border border-border bg-card">
-                {rows.map((p) => (
-                  <li key={p.id} className="flex items-center gap-3 px-3 py-3">
-                    <Link
-                      href={`/players/${p.id}`}
-                      className="flex min-w-0 flex-1 items-center gap-3"
-                    >
-                      <Avatar
-                        jerseyNumber={p.jerseyNumber}
-                        headshotUrl={p.headshotUrl}
-                        name={p.fullName}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline gap-2">
-                          <span className="truncate font-semibold text-foreground">
-                            {p.fullName}
-                          </span>
-                          <span className="tnum shrink-0 text-sm text-muted-foreground">
-                            #{p.jerseyNumber}
-                          </span>
-                        </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          added by{" "}
-                          {selections.find((s) => s.prospectId === p.id)
-                            ?.selectedByName ?? "an officer"}
-                        </p>
-                      </div>
-                      <span
-                        className="tnum shrink-0 text-xl font-bold"
-                        style={{ color: ratingColor(p.primary.rating) }}
-                      >
-                        {formatRating(p.primary.rating)}
-                      </span>
-                    </Link>
-
-                    <SelectToggle
-                      prospectId={p.id}
-                      prospectName={p.fullName}
-                      initialSelected
-                    />
-                  </li>
-                ))}
-              </ul>
-            </section>
+          {byPosition.map((group) => (
+            <PositionGroup
+              key={group.position}
+              template={template}
+              label={group.label}
+              components={group.components}
+              rows={group.rows}
+              addedBy={addedBy}
+            />
           ))}
         </div>
       )}
