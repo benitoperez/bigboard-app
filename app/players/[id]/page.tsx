@@ -108,10 +108,11 @@ export default async function ProspectPage({
 
         </div>
 
-        {/* The primary rating, on its own line and aligned right. It is the
-            headline number, so it stays big - but never at the cost of the
-            name being readable. */}
-        <div className="mt-3 flex justify-end">
+        {/* The primary rating, on its own line and CENTRED. It is the
+            headline number - the one thing the screen exists to say - so it
+            sits on the card's axis rather than pushed to one edge, and it
+            never costs the name its width. */}
+        <div className="mt-3 flex justify-center">
           <PositionScore
             code={primaryRating.position}
             label={primaryRating.label}
