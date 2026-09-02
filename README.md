@@ -8,7 +8,7 @@ Evaluators rate athletes all from their phones on the field, and the app consoli
 
 Tryouts get run on clipboards and shared spreadsheets. Fifteen evaluators score a hundred or more athletes at once, on a field, with no live consolidation. Some evaluators see certain athletes far more than others, and nobody can tell which scores rest on one look and which on ten. Cut decisions end up driven by whoever speaks loudest rather than by the data.
 
-Tools such as Hudl, TeamSnap and the recruiting platforms are built and priced for funded programs with dedicated staff. Nothing serves a self-organized club running a two-hour tryout on no budget. That is the gap this fills.
+Tools such as Hudl, TeamSnap and the recruiting platforms are built and priced for funded programs with dedicated staff. Nothing serves a self-organized club running a two-hour tryout on no budget. This is the very gap this app fills.
 
 ## How it works
 
