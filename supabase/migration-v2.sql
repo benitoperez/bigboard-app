@@ -797,6 +797,16 @@ $drop_policies$;
 -- per-org role in v2, so the global flag has no meaning left.
 alter table profiles drop column is_admin;
 
+-- Flush the deferred sum-to-100 checks queued by the seed inserts and
+-- the default org's template copy. ALTER TABLE refuses to touch a table
+-- with pending trigger events (55006), and position_weights has them
+-- until that constraint trigger fires.
+--
+-- Doing it here also validates every seeded position NOW, with a clear
+-- error naming the position, instead of at COMMIT where it would be
+-- reported after everything else had already succeeded.
+set constraints all immediate;
+
 alter table orgs                enable row level security;
 alter table profiles            enable row level security;  -- already on from v1 (officers); harmless
 alter table memberships         enable row level security;
