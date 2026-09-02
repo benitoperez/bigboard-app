@@ -7,6 +7,7 @@ import { tryoutPeriod } from "@/lib/tryouts";
 import { getSelections } from "@/lib/data/selections";
 import { boardOrder } from "@/lib/template";
 import { NoTryout } from "@/components/no-tryout";
+import { ExportButton } from "@/app/account/export-button";
 import { ratingColor, formatRating } from "@/lib/rating-color";
 import { Avatar } from "@/components/avatar";
 import { SelectToggle } from "@/components/select-toggle";
@@ -75,6 +76,18 @@ export default async function SelectedPage() {
           on the team list
         </p>
       </div>
+
+      {/* Export just this list. Admin+, same as the full export - it carries
+          the same ratings, only for fewer people. */}
+      {is_admin && selected.length > 0 && (
+        <div className="mt-3">
+          <ExportButton
+            scope="selected"
+            label="Export the team list"
+            hint="Only the athletes above, with their full ratings."
+          />
+        </div>
+      )}
 
       {selected.length === 0 ? (
         <div className="mt-6 rounded-lg border border-dashed border-border-strong p-6 text-center">

@@ -28,6 +28,17 @@ const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
  */
 const MODEL = process.env.GEMINI_MODEL ?? "gemini-3.6-flash";
 
+/**
+ * One piece of a request. Text, or an inline image.
+ *
+ * Images are sent as base64 in the request body rather than uploaded first:
+ * a resized roster photo is a few hundred KB, and the Files API would add a
+ * round trip and a lifetime to manage for something used once.
+ */
+export type Part =
+  | { text: string }
+  | { inlineData: { mimeType: string; data: string } };
+
 export type GeminiResult =
   | { ok: true; text: string }
   | { ok: false; error: string; status: number };
@@ -39,6 +50,14 @@ export type GeminiResult =
  */
 export async function generate(
   prompt: string,
+  options: { json?: boolean; maxOutputTokens?: number } = {},
+): Promise<GeminiResult> {
+  return generateFromParts([{ text: prompt }], options);
+}
+
+/** The multimodal form. `generate` is the text-only shorthand for it. */
+export async function generateFromParts(
+  parts: Part[],
   options: { json?: boolean; maxOutputTokens?: number } = {},
 ): Promise<GeminiResult> {
   const key = process.env.GEMINI_API_KEY;
@@ -54,7 +73,7 @@ export async function generate(
   }
 
   const body = {
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    contents: [{ role: "user", parts }],
     generationConfig: {
       temperature: 0.2,
       maxOutputTokens: options.maxOutputTokens ?? 1024,
@@ -72,8 +91,12 @@ export async function generate(
       },
       body: JSON.stringify(body),
       // A phone on stadium wifi should not hang on this. The caller treats a
-      // failure as "try again", and quota is only spent on success.
-      signal: AbortSignal.timeout(25_000),
+      // failure as "try again", and quota is only spent on success. Reading
+      // several roster photos genuinely takes longer than answering about
+      // one athlete, so the budget scales with what was sent.
+      signal: AbortSignal.timeout(
+        parts.some((p) => "inlineData" in p) ? 90_000 : 25_000,
+      ),
     });
   } catch {
     return { ok: false, status: 504, error: "The AI request timed out." };

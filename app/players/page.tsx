@@ -59,6 +59,7 @@ export default async function PlayersPage() {
             tryoutName={tryout.name}
             tryoutId={tryout.id}
             orgId={activeOrg!.orgId}
+            template={template}
             positions={boardOrder(template).map((p) => ({
               code: p.code,
               label: p.label,
@@ -81,6 +82,7 @@ export default async function PlayersPage() {
                 tryoutName={tryout.name}
                 tryoutId={tryout.id}
                 orgId={activeOrg!.orgId}
+                template={template}
                 positions={boardOrder(template).map((p) => ({
                   code: p.code,
                   label: p.label,

@@ -43,6 +43,7 @@ This is the consolidated list; nothing breaks that is not on it.
 | B19 | `verify:rating` and `seed:dev` read `positions.ts` at runtime | They read the seed definitions / DB template instead |
 | B20 | KPI strip hardcodes "fastest 40" (SPEC §10.1) | KPI shows best result per measured drill, direction-aware |
 | B21 | Headshot storage path is `{prospect_id}` scoped only by bucket (HANDOFF §5) | Paths become `{org_id}/{prospect_id}…`; storage policies check org membership on the path's first segment |
+| B23 | CSV import is admin-only (SPEC §12) | Import is evaluator+; export is the admin-gated direction instead (§10b.1) |
 | B22 | CLAUDE.md rules 1, 2, 6, 8 as written | Need rewriting when v2 merges (see §12). Until merge, this spec is the flag that rule 6 (never touch RLS silently) demands |
 
 **Not broken, deliberately:** the exact `computePositionRating` math and
@@ -814,9 +815,143 @@ independent), then 11.
 
 ---
 
+## 10b. Bulk roster import
+
+Added after the v2.0 release. Supersedes §6.3 and the admin-only framing of
+the v1 CSV import.
+
+### 10b.1 Permissions
+
+| Action | viewer | evaluator | admin | owner |
+|---|---|---|---|---|
+| Import a roster (all three sources) | | ✔ | ✔ | ✔ |
+| Export CSV | | | ✔ | ✔ |
+
+**⚠ BREAKS V1 (B23):** CSV import was admin-only in v1 and in v2.0. It is
+now evaluator+, because the people holding phones at a tryout are the ones
+with the roster. Export stays admin+: a full export is every rating every
+officer has given, and that is a different kind of disclosure from adding
+athletes.
+
+The RLS policies already permit this — `prospects_insert` and
+`prospects_update` are both `app.is_evaluator(org_id)` — so no policy change
+is required. **`prospects_delete` is admin-only, and that matters** (§10b.5).
+
+### 10b.2 Entry points
+
+Two, opening the same flow:
+
+1. **Account → Import Roster** (as today).
+2. **A button inside the manual Add Athlete sheet**, "Import full roster",
+   with subtext naming the supported sources. Rendered for evaluator+.
+
+The second exists because adding athletes one at a time is where someone
+realises they have a whole list; making them back out to a settings tab to
+act on that is the wrong shape.
+
+### 10b.3 Sources
+
+A picker with three options, all converging on one review table:
+
+| Source | Path |
+|---|---|
+| CSV or Excel file | Papaparse, no AI call |
+| Photo or screenshot | AI extraction |
+| Pasted text or table | AI extraction |
+
+The **CSV path never calls the AI.** A file that already parses does not
+need a model, and routing it through one would spend quota and add a failure
+mode for no gain. AI cleanup remains available on a CSV that fails
+validation (§6.3).
+
+### 10b.4 AI extraction
+
+Extends the authenticated AI routes (§6.2) — same guard order, same
+`ai_usage` accounting, same daily caps. Evaluator+ rather than admin.
+
+- Accepts JPG, PNG and HEIC. Images are resized client-side before upload
+  and capped at 5MB each; **multiple images are accepted in one request**,
+  because a paper roster is often several pages.
+- The prompt carries the org's valid position codes and the exact target
+  schema: `first_name`, `last_name`, `jersey_number`, `positions`, and one
+  field per template drill.
+- **The model must return `null` for any field it cannot read confidently,
+  and flag it.** It is told explicitly never to guess or infer. A wrong
+  jersey number that looks plausible is worse than a blank one, because a
+  blank gets fixed and a plausible one gets imported.
+
+### 10b.5 The review table
+
+**All three sources land here, and nothing reaches the database until the
+user confirms.** This is the whole safety model: extraction is a proposal,
+the table is the decision.
+
+- Fields the AI flagged as low-confidence render **highlighted**, and every
+  cell is editable.
+- Positions are normalized and validated against the org template; invalid
+  ones are flagged for correction rather than dropped.
+- **A jersey collision with an existing prospect in the active tryout is a
+  per-row choice — skip, overwrite, or edit — never a whole-file failure.**
+  v1 rejected the entire file on any collision, which is right for a file
+  you can go fix in a spreadsheet and wrong for a photo of a roster where
+  three names overlap last season's.
+
+### 10b.6 Atomicity
+
+The commit runs as **one `import_roster` RPC in a single transaction**,
+not as a sequence with a rollback.
+
+This is not a preference. v1 achieved effective atomicity by deleting the
+prospects it had just inserted if a later write failed — and
+`prospects_delete` is **admin-only**. An evaluator hitting that path could
+not roll back and would leave a half-imported roster behind. The function is
+`security invoker`, so every statement is still checked against the caller's
+RLS policies; what it adds is one transaction boundary.
+
+Overwrites are `UPDATE`s, which evaluators are permitted, so no part of the
+flow needs a policy an evaluator lacks.
+
+---
+
+## 10c. CSV export
+
+Admin+. One row per prospect, wide format, for the active tryout.
+
+### 10c.1 Columns
+
+Every column is generated from the org's template. **Nothing is hardcoded**,
+which is the same rule the rest of v2 lives under (§3).
+
+| Group | Columns |
+|---|---|
+| Identity | `first_name`, `last_name`, `jersey_number`, `primary_position`, `secondary_positions`, `selected` |
+| Per drill | `{drill}_1..N` (each attempt), `{drill}_best`, `{drill}_avg` |
+| Per position | `{CODE}_rating`, `{CODE}_inputs` |
+| Per attribute | `{attr}_median`, `{attr}_raters` |
+
+- A position column is **blank** where the prospect does not play it, and
+  blank where the rating is gated. Blank is not zero, and an unrated
+  attribute must never export as `0` — a spreadsheet will average it.
+- Ratings are the 45–99 display band, matching what officers saw on screen.
+
+### 10c.2 Entry points and naming
+
+- **Account → Export**, the whole active tryout.
+- **Selected → Export**, only the prospects on the shared team list.
+
+Filename: `{org}-{tryout}-{date}.csv`, slugified.
+
+### 10c.3 Out of scope
+
+**Long-format export** — one row per individual officer rating, for
+per-rater analysis — is deliberately deferred. It answers a different
+question (who rates hot, who disagrees) and belongs with rater-bias
+normalization, which v1 §17 already defers.
+
 ## 11. Explicitly out of scope for v2
 
 - Basketball template (visible, grayed out, Coming Soon — no seed rows)
+- Long-format CSV export, one row per rating (§10c.3)
 - Per-pitch tracking for pitchers (orgs can self-serve via template editing)
 - Multiple templates per org; template sharing/marketplace
 - Org-level AI kill switch and org-editable AI caps

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { addAthlete } from "./add-actions";
 import { setHeadshotPath } from "./[id]/headshot-actions";
 import { createClient } from "@/lib/supabase/client";
+import { ImportSheet } from "./import/import-sheet";
+import type { Template } from "@/lib/template";
 import {
   HEADSHOT_MAX_EDGE,
   formatBytes,
@@ -27,6 +29,7 @@ export function AddAthlete({
   tryoutId,
   orgId,
   positions,
+  template,
   size = "normal",
 }: {
   tryoutName: string;
@@ -35,6 +38,8 @@ export function AddAthlete({
   orgId: string;
   /** The org template's positions, in board order. */
   positions: PositionOption[];
+  /** Passed through to the bulk import flow inside the sheet. */
+  template: Template;
   /**
    * "large" is for an empty roster, where adding someone is the only thing
    * worth doing on the screen. It shrinks back to "normal" once there is at
@@ -67,6 +72,7 @@ export function AddAthlete({
           tryoutId={tryoutId}
           orgId={orgId}
           positions={positions}
+          template={template}
           onClose={() => setOpen(false)}
           onAdded={() => {
             setOpen(false);
@@ -83,6 +89,7 @@ function AddSheet({
   tryoutId,
   orgId,
   positions,
+  template,
   onClose,
   onAdded,
 }: {
@@ -90,6 +97,7 @@ function AddSheet({
   tryoutId: string;
   orgId: string;
   positions: PositionOption[];
+  template: Template;
   onClose: () => void;
   onAdded: () => void;
 }) {
@@ -324,6 +332,26 @@ function AddSheet({
         {/* Photo last, and optional. Adding it here saves walking back to
             the profile for every athlete, but nothing waits on it: the
             athlete is created first and the upload follows. */}
+        {/* Adding athletes one at a time is exactly where someone realises
+            they have a whole roster. Making them back out to a settings tab
+            to act on that is the wrong shape. */}
+        <div className="mt-4 border-t border-border pt-3">
+          <ImportSheet
+            template={template}
+            orgId={orgId}
+            trigger={
+              <span className="bb-card flex min-h-tap-large w-full cursor-pointer flex-col justify-center rounded-lg border border-chip-violet/40 bg-chip-violet/10 px-4 py-2 text-left">
+                <span className="text-sm font-bold text-foreground">
+                  Import full roster
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  CSV or Excel, a photo of a sheet, or pasted text
+                </span>
+              </span>
+            }
+          />
+        </div>
+
         <p className="mt-4 text-sm text-muted-foreground">Photo (optional)</p>
         <div className="mt-1 flex items-center gap-3">
           <label

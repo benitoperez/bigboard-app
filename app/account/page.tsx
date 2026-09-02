@@ -7,6 +7,8 @@ import { getInviteCodes, getMembers } from "@/lib/data/org";
 import { getTemplateForTryout } from "@/lib/data/template";
 import { signOut } from "@/app/login/actions";
 import { CsvImport } from "./csv-import";
+import { ImportSheet } from "@/app/players/import/import-sheet";
+import { ExportButton } from "./export-button";
 import { DeleteAllProspects } from "./delete-all";
 import { TryoutManager } from "./tryout-manager";
 import { MembersPanel } from "./members-panel";
@@ -26,7 +28,7 @@ export const metadata: Metadata = { title: "Account - Big Board" };
  * rendered for the right people.
  */
 export default async function AccountPage() {
-  const { profile, email, userId, role, is_admin, activeOrg, memberships } =
+  const { profile, email, userId, role, is_admin, is_evaluator, activeOrg, memberships } =
     await requireOrg();
 
   // requireOrg guarantees both; narrowing for the type checker.
@@ -118,8 +120,55 @@ export default async function AccountPage() {
       {/* ---- Admin+: tryout classes, import, destructive data controls ---- */}
       <TryoutManager tryouts={tryouts} isAdmin={is_admin} />
 
+      {/* ---- Evaluator+: bulk import (SPEC-V2 section 10b.2) ---- */}
+      {is_evaluator && template && tryout && (
+        <section className="bb-card mt-4 rounded-lg border border-border bg-card p-4">
+          <h2 className="text-xl uppercase">Import Roster</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            A file, a photo of a printed sheet, or pasted text. Everything
+            lands in a review table first &mdash; nothing is saved until you
+            confirm it.
+          </p>
+          <div className="mt-3">
+            <ImportSheet
+              template={template}
+              orgId={activeOrg.orgId}
+              trigger={
+                <span
+                  className="min-h-tap-large flex w-full cursor-pointer items-center
+                             justify-center rounded-lg bg-primary px-6 text-base
+                             font-bold tracking-wide text-primary-foreground"
+                >
+                  Import a roster
+                </span>
+              }
+            />
+          </div>
+        </section>
+      )}
+
+      {/* ---- Admin+: export, then the destructive data controls ---- */}
       {is_admin && (
         <>
+          <section className="bb-card mt-4 rounded-lg border border-border bg-card p-4">
+            <h2 className="text-xl uppercase">Export</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              One row per athlete, with every drill, position rating and
+              attribute in this class. Admins only &mdash; an export carries
+              every rating every officer has given.
+            </p>
+            <div className="mt-3">
+              <ExportButton
+                scope="all"
+                label="Export this tryout class"
+                hint={`${takenJerseys.length} ${takenJerseys.length === 1 ? "athlete" : "athletes"} in ${tryout?.name ?? "the class"}.`}
+              />
+            </div>
+          </section>
+
+          {/* The older single-file panel stays: it carries the AI cleanup
+              path for a messy CSV that fails validation, which the new flow
+              deliberately does not duplicate. */}
           {template && (
             <div className="mt-4">
               <CsvImport

@@ -74,6 +74,7 @@ export default async function HomePage() {
                 tryoutName={tryout.name}
                 tryoutId={tryout.id}
                 orgId={activeOrg!.orgId}
+                template={template}
                 positions={boardOrder(template).map((p) => ({
                   code: p.code,
                   label: p.label,
