@@ -99,6 +99,7 @@ export function BoardView({
           prospects={prospects}
           sort={active.sort}
           readout={active.readout}
+          valueIsRating={active.value === DEFAULT_SORT}
         />
       )}
     </>
@@ -120,10 +121,13 @@ function RankedList({
   prospects,
   sort,
   readout,
+  valueIsRating,
 }: {
   prospects: ProspectRow[];
   sort: (a: ProspectRow, b: ProspectRow) => number;
   readout: ((p: ProspectRow) => string | null) | null;
+  /** True when the sorted value is the rating the dial already shows. */
+  valueIsRating: boolean;
 }) {
   const rows = [...prospects].sort(sort);
 
@@ -170,9 +174,21 @@ function RankedList({
                 </div>
               </div>
 
-              <span className="tnum shrink-0 text-base font-bold text-foreground">
-                {value ?? "--"}
-              </span>
+              {/* The dial is always here, whatever the sort. It is how a
+                  rating reads everywhere else in the app, and dropping it
+                  when this list became the default view quietly took the
+                  colour band - the thing that makes an 87 and a 62 tell
+                  apart at a glance - off the busiest screen.
+
+                  When sorting by something OTHER than the rating, the sorted
+                  value sits beside it: the dial answers "how good", the
+                  number answers "by what you asked to sort on". */}
+              {!valueIsRating && (
+                <span className="tnum shrink-0 text-sm font-bold text-foreground">
+                  {value ?? "--"}
+                </span>
+              )}
+              <Dial rating={p.primary.rating} size="sm" />
             </Link>
           </li>
         );
