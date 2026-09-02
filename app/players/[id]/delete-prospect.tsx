@@ -49,7 +49,7 @@ export function DeleteProspect({
   }
 
   return (
-    <div className="mt-8 rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+    <div className="bb-card mt-8 rounded-lg border border-destructive/50 bg-destructive/10 p-4">
       <p className="text-sm font-bold text-foreground">
         Delete #{jerseyNumber} {prospectName}?
       </p>

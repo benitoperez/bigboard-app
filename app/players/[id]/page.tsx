@@ -46,7 +46,7 @@ export default async function ProspectPage({
       </Link>
 
       {/* ---- Header (SPEC.md section 10.3) ---- */}
-      <header className="mt-2 rounded-lg border border-border bg-card p-4">
+      <header className="mt-2 bb-card rounded-lg border border-border bg-card p-4">
         <div className="flex items-start gap-4">
           <div className="relative shrink-0">
             <Avatar
@@ -152,7 +152,7 @@ export default async function ProspectPage({
             {p.drills.map((d) => (
               <div
                 key={d.drill.key}
-                className="flex flex-1 items-baseline gap-2 rounded-md border border-border-strong bg-secondary px-3 py-2"
+                className="flex flex-1 items-baseline gap-2 bb-card rounded-md border border-border-strong bg-secondary px-3 py-2"
               >
                 <p className="text-[11px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
                   {d.drill.label}
@@ -199,7 +199,7 @@ export default async function ProspectPage({
           attributes are rated once and count toward each.
         </p>
 
-        <div className="mt-2 rounded-lg border border-border bg-card px-4">
+        <div className="mt-2 bb-card rounded-lg border border-border bg-card px-4">
           {p.attributes.map((a) => (
             <RatingSlider
               key={a.key}

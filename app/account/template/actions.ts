@@ -397,3 +397,37 @@ export async function setMinRatings(
   if (error) return { ok: false, error: error.message };
   return done();
 }
+
+/**
+ * Put one position's weights back to the seeded defaults.
+ *
+ * Goes through an RPC because the seed templates belong to the system org
+ * and nobody is a member of it — the RLS policy on templates means an admin
+ * genuinely cannot read the defaults their own template was copied from.
+ * The RPC also makes the delete-and-restore one transaction, which the
+ * deferred sum-to-100 trigger requires.
+ */
+export async function resetPositionWeights(
+  templateId: string,
+  positionId: string,
+): Promise<TemplateResult> {
+  const auth = await requireTemplateAdmin(templateId);
+  if ("error" in auth) return { ok: false, error: auth.error };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("reset_position_weights", {
+    p_position: positionId,
+  });
+
+  if (error) return { ok: false, error: error.message };
+  return done();
+}
+
+/** Whether this position has built-in defaults at all. */
+export async function positionHasDefaults(positionId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("position_has_defaults", {
+    p_position: positionId,
+  });
+  return data === true;
+}

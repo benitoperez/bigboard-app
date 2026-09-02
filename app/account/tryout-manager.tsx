@@ -62,7 +62,7 @@ export function TryoutManager({
   }
 
   return (
-    <section className="mt-4 rounded-lg border border-border bg-card p-4">
+    <section className="mt-4 bb-card rounded-lg border border-border bg-card p-4">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-xl uppercase">Active Tryout</h2>
         <span className="text-xs text-muted-foreground">

@@ -66,7 +66,7 @@ export default async function SelectedPage() {
       </header>
 
       {/* Total count, large, at the top. */}
-      <div className="mt-4 rounded-lg border border-border bg-card p-5 text-center">
+      <div className="mt-4 bb-card rounded-lg border border-border bg-card p-5 text-center">
         <p className="tnum text-6xl font-bold text-foreground">
           {selected.length}
         </p>
@@ -106,7 +106,7 @@ export default async function SelectedPage() {
                 </span>
               </div>
 
-              <ul className="mt-2 divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+              <ul className="mt-2 divide-y divide-border overflow-hidden bb-card rounded-lg border border-border bg-card">
                 {rows.map((p) => (
                   <li key={p.id} className="flex items-center gap-3 px-3 py-3">
                     <Link

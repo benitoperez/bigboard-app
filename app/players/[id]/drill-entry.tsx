@@ -58,7 +58,7 @@ function DrillSection({
         feeds the rating.
       </p>
 
-      <div className="mt-2 rounded-lg border border-border bg-card p-4">
+      <div className="mt-2 bb-card rounded-lg border border-border bg-card p-4">
         <div className="flex gap-3">
           {Array.from({ length: drill.maxAttempts }, (_, i) => {
             const n = i + 1;

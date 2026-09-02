@@ -37,14 +37,14 @@ export function Avatar({
       <img
         src={headshotUrl}
         alt={name ?? `#${jerseyNumber}`}
-        className={`${dims} shrink-0 rounded-full object-cover`}
+        className={`${dims} bb-avatar-photo shrink-0 rounded-full object-cover`}
       />
     );
   }
 
   return (
     <div
-      className={`${dims} ${avatarColor(jerseyNumber)} tnum flex shrink-0 items-center justify-center rounded-full font-bold`}
+      className={`${dims} ${avatarColor(jerseyNumber)} bb-avatar tnum flex shrink-0 items-center justify-center rounded-full font-bold`}
       aria-hidden="true"
     >
       {jerseyNumber}

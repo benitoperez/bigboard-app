@@ -179,7 +179,7 @@ export function CsvImport({
   }
 
   return (
-    <section className="rounded-lg border border-border bg-card p-4">
+    <section className="bb-card rounded-lg border border-border bg-card p-4">
       <h2 className="text-xl uppercase">Import Roster</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         Required:{" "}

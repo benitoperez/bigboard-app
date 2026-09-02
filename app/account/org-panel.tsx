@@ -45,7 +45,7 @@ export function OrgPanel({
   }
 
   return (
-    <section className="mt-4 rounded-lg border border-border bg-card p-4">
+    <section className="mt-4 bb-card rounded-lg border border-border bg-card p-4">
       <h2 className="text-xs font-semibold tracking-[0.15em] text-muted-foreground uppercase">
         Organization
       </h2>
@@ -203,7 +203,7 @@ export function DeleteOrgPanel({ orgName }: { orgName: string }) {
   const matches = typed.trim() === orgName;
 
   return (
-    <section className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+    <section className="bb-card mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-4">
       <h2 className="text-xs font-semibold tracking-[0.15em] text-destructive uppercase">
         Danger Zone
       </h2>

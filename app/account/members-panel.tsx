@@ -54,7 +54,7 @@ export function MembersPanel({
         </p>
       )}
 
-      <ul className="mt-2 divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+      <ul className="mt-2 divide-y divide-border overflow-hidden bb-card rounded-lg border border-border bg-card">
         {members.map((m) => (
           <MemberRow
             key={m.userId}

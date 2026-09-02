@@ -239,6 +239,60 @@
   outline-offset: 2px;
 }
 
+
+/* ------------------------------------------------------------------
+   Surfaces and avatars.
+
+   Sunlight is the constraint (CLAUDE.md rule 7). These lift cards off
+   the background so edges stay findable in glare, without touching
+   contrast: the shadow sits UNDER the card and the border does the
+   real separating work, so nothing gets closer in luminance.
+   ------------------------------------------------------------------ */
+
+/* Every panel that reads as a raised surface. */
+.bb-card {
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.4),
+    0 4px 12px rgb(0 0 0 / 0.35);
+}
+
+/* Slightly deeper, for panels that sit on top of another card. */
+.bb-card-raised {
+  box-shadow:
+    0 2px 4px rgb(0 0 0 / 0.45),
+    0 8px 24px rgb(0 0 0 / 0.4);
+}
+
+/*
+ * The jersey-number avatar.
+ *
+ * A flat fill reads as a placeholder; the gradient and inner highlight
+ * make it read as an intentional object next to real headshots. The
+ * base colour still comes from the jersey number, so a prospect keeps
+ * the same identity everywhere - only the surface treatment is new.
+ */
+.bb-avatar {
+  background-image:
+    linear-gradient(
+      160deg,
+      rgb(255 255 255 / 0.28) 0%,
+      rgb(255 255 255 / 0.06) 42%,
+      rgb(0 0 0 / 0.18) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    inset 0 -2px 6px rgb(0 0 0 / 0.25),
+    0 2px 6px rgb(0 0 0 / 0.45);
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.45);
+}
+
+/* Headshots get the same lift, so the two kinds sit at one depth. */
+.bb-avatar-photo {
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.12),
+    0 2px 6px rgb(0 0 0 / 0.45);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

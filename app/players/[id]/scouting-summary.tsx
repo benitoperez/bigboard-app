@@ -72,7 +72,7 @@ export function ScoutingSummary({
           type="button"
           onClick={run}
           disabled={pending}
-          className="min-h-tap-large mt-2 w-full rounded-lg border border-border bg-card
+          className="min-h-tap-large mt-2 w-full bb-card rounded-lg border border-border bg-card
                      text-sm font-semibold text-foreground active:bg-secondary disabled:opacity-50"
         >
           {pending ? "Writing..." : "Generate AI scouting summary"}

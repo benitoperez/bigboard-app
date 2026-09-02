@@ -7,7 +7,7 @@ import type {
   Template,
   TemplatePosition,
 } from "@/lib/template";
-import { savePositionWeights } from "./actions";
+import { resetPositionWeights, savePositionWeights } from "./actions";
 
 /**
  * Weights for one position — SPEC-V2.md section 3.1.
@@ -32,7 +32,17 @@ export function WeightsEditor({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [draft, setDraft] = useState<PositionComponent[]>(position.components);
+
+  // After a reset or a save, the server hands back new weights. Re-seeding
+  // the draft from them is what makes the panel show the restored numbers
+  // instead of the ones the user was editing.
+  const [syncedTo, setSyncedTo] = useState(position.components);
+  if (syncedTo !== position.components) {
+    setSyncedTo(position.components);
+    setDraft(position.components);
+  }
 
   const total = useMemo(
     () => draft.reduce((s, c) => s + (Number.isFinite(c.weight) ? c.weight : 0), 0),
@@ -76,6 +86,22 @@ export function WeightsEditor({
     if (!key) return;
     setSaved(false);
     setDraft((d) => [...d, { kind, key, weight: 0 } as PositionComponent]);
+  }
+
+  function reset() {
+    setError(null);
+    startTransition(async () => {
+      const res = await resetPositionWeights(template.id, position.id);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      // Bring the draft back in step with what was just written, so the
+      // panel does not still look dirty against the old values.
+      setSaved(true);
+      setResetting(false);
+      router.refresh();
+    });
   }
 
   function save() {
@@ -181,6 +207,45 @@ export function WeightsEditor({
         <p role="status" className="mt-2 text-xs text-primary">
           Saved. Boards update immediately.
         </p>
+      )}
+
+      {resetting ? (
+        <div className="mt-2 rounded-md border border-border bg-secondary p-2">
+          <p className="text-xs text-foreground">
+            Put {position.code} back to the built-in defaults? Your current
+            weights for this position are replaced.
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={reset}
+              disabled={pending}
+              className="min-h-tap rounded-md border border-border px-3 text-xs
+                         font-semibold text-foreground active:bg-card disabled:opacity-50"
+            >
+              {pending ? "Restoring..." : "Restore defaults"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setResetting(false)}
+              disabled={pending}
+              className="min-h-tap rounded-md border border-border px-3 text-xs
+                         font-semibold text-muted-foreground disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setResetting(true)}
+          disabled={pending}
+          className="min-h-tap mt-2 w-full rounded-md border border-border text-xs
+                     font-semibold text-muted-foreground active:bg-secondary disabled:opacity-50"
+        >
+          Reset {position.code} to defaults
+        </button>
       )}
 
       <button

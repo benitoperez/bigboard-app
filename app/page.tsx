@@ -3,16 +3,8 @@ import { requireOrg } from "@/lib/auth";
 import { getProspects, type ProspectRow } from "@/lib/data/prospects";
 import { getActiveTryout } from "@/lib/data/tryouts";
 import { tryoutPeriod } from "@/lib/tryouts";
-import {
-  boardOrder,
-  formatDrillValue,
-  getDrill,
-  type Template,
-  type TemplatePosition,
-} from "@/lib/template";
-import { Avatar } from "@/components/avatar";
-import { Dial } from "@/components/dial";
-import { compareForBoard } from "@/lib/ratings";
+import { formatDrillValue, type Template } from "@/lib/template";
+import { BoardView } from "./board-view";
 
 export default async function HomePage() {
   // Redirects to the screen that matches the failure: /login when signed
@@ -67,19 +59,7 @@ export default async function HomePage() {
           No prospects yet. Import a roster from the Account screen.
         </p>
       ) : (
-        <div className="mt-6 space-y-6">
-          {/* SPEC.md section 10.1: boards render in the template's sort
-              order, so priority positions reorder from the template editor
-              without touching this file. */}
-          {boardOrder(template).map((position) => (
-            <Board
-              key={position.code}
-              template={template}
-              position={position}
-              prospects={prospects}
-            />
-          ))}
-        </div>
+        <BoardView template={template} prospects={prospects} />
       )}
     </main>
   );
@@ -113,6 +93,12 @@ function KpiStrip({
     ? prospects.reduce((a, b) => (inputsFor(a) >= inputsFor(b) ? a : b))
     : null;
 
+  // "Fully rated" means the primary position cleared the gate - every
+  // weighted component covered and enough officer inputs. It is the number
+  // that actually says how ready the board is to cut from, which a raw
+  // count of ratings does not.
+  const fullyRated = prospects.filter((p) => p.primary.rating !== null).length;
+
   const drillLeaders = template.drills.map((drill) => {
     const measured = prospects.filter((p) => p.drills[drill.key] != null);
     const leader = measured.length
@@ -138,150 +124,84 @@ function KpiStrip({
       value: leader
         ? formatDrillValue(drill, leader.drills[drill.key]!.best)
         : "--",
-      sub: leader
-        ? `#${leader.jerseyNumber} ${leader.lastName}`
-        : "none measured",
+      person: leader,
     };
   });
 
   return (
     <dl className="mt-4 grid grid-cols-2 gap-2">
       {drillLeaders.map((d) => (
-        <Kpi key={d.key} label={d.label} value={d.value} sub={d.sub} />
+        <Kpi
+          key={d.key}
+          label={d.label}
+          value={d.value}
+          person={d.person}
+          emptyNote="none measured"
+        />
       ))}
       <Kpi
         label="Most rated"
         value={mostRated ? String(inputsFor(mostRated)) : "0"}
-        sub={
-          mostRated && inputsFor(mostRated) > 0
-            ? `#${mostRated.jerseyNumber} ${mostRated.lastName}`
-            : "no ratings yet"
-        }
+        person={mostRated && inputsFor(mostRated) > 0 ? mostRated : null}
+        emptyNote="no ratings yet"
       />
       <Kpi label="Prospects" value={String(prospects.length)} sub="in this tryout" />
-      <Kpi label="Ratings logged" value={String(totalRatings)} sub="across all officers" />
+      <Kpi
+        label="Ratings Given"
+        value={String(fullyRated)}
+        sub={`fully rated · ${totalRatings} total ratings logged`}
+      />
     </dl>
   );
 }
 
-function Kpi({ label, value, sub }: { label: string; value: string; sub: string }) {
+/**
+ * One dashboard tile.
+ *
+ * When the tile is ABOUT a person, their name is the headline under the
+ * number and links straight to the profile - the fastest athlete in the
+ * class is someone you immediately want to open, and reading the name then
+ * hunting for it in the directory was the long way round.
+ */
+function Kpi({
+  label,
+  value,
+  sub,
+  person,
+  emptyNote,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  person?: ProspectRow | null;
+  emptyNote?: string;
+}) {
   return (
-    <div className="rounded-lg border border-border bg-card p-3">
+    <div className="bb-card rounded-lg border border-border bg-card p-3">
       <dt className="text-[11px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
         {label}
       </dt>
       <dd className="tnum mt-1 text-2xl font-bold text-foreground">{value}</dd>
-      <dd className="truncate text-xs text-muted-foreground">{sub}</dd>
+
+      {person ? (
+        <dd>
+          <Link
+            href={`/players/${person.id}`}
+            className="-mx-1 flex min-h-tap items-center gap-1.5 rounded px-1 active:bg-secondary"
+          >
+            <span className="truncate text-sm font-semibold text-primary">
+              {person.fullName}
+            </span>
+            <span className="tnum shrink-0 text-xs text-muted-foreground">
+              #{person.jerseyNumber}
+            </span>
+          </Link>
+        </dd>
+      ) : (
+        <dd className="truncate text-xs text-muted-foreground">
+          {sub ?? emptyNote}
+        </dd>
+      )}
     </div>
-  );
-}
-
-/**
- * One position board - SPEC.md section 10.1.
- *
- * Sorted by RAW score descending, never by the 45-99 display number: the band
- * compresses real gaps, so two prospects can share a display value while one
- * is genuinely ahead. Section 8 is explicit about this.
- *
- * Gated prospects sort to the bottom and render grayed out rather than being
- * hidden, so officers can see who still needs eyes on them.
- */
-function Board({
-  template,
-  position,
-  prospects,
-}: {
-  template: Template;
-  position: TemplatePosition;
-  prospects: ProspectRow[];
-}) {
-  // The drills this position is actually scored on, so a row shows the
-  // measurements that moved its own number rather than every drill in the
-  // template.
-  const drillKeys = position.components
-    .filter((c) => c.kind === "drill")
-    .map((c) => c.key);
-
-  const rows = prospects
-    .filter((p) => p.playedPositions.includes(position.code))
-    .map((p) => ({ p, r: p.ratingsByPosition[position.code]! }))
-    .sort((a, b) =>
-      compareForBoard(
-        { raw: a.r.raw, jerseyNumber: a.p.jerseyNumber },
-        { raw: b.r.raw, jerseyNumber: b.p.jerseyNumber },
-      ),
-    );
-
-  if (rows.length === 0) return null;
-
-  const ranked = rows.filter((x) => x.r.rating !== null).length;
-
-  return (
-    <section>
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-sm font-bold tracking-wide text-primary uppercase">
-          {position.label}
-        </h2>
-        <span className="tnum text-xs text-muted-foreground">
-          {ranked} of {rows.length} rated
-        </span>
-      </div>
-
-      <ol className="mt-2 divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
-        {rows.map(({ p, r }, i) => {
-          const gated = r.rating === null;
-          return (
-            <li key={p.id}>
-              <Link
-                href={`/players/${p.id}`}
-                className={
-                  "flex min-h-tap-large items-center gap-3 px-3 py-2 active:bg-secondary " +
-                  (gated ? "opacity-45" : "")
-                }
-              >
-                <span className="tnum w-5 shrink-0 text-right text-xs text-muted-foreground">
-                  {gated ? "" : i + 1}
-                </span>
-
-                <Avatar
-                  jerseyNumber={p.jerseyNumber}
-                  headshotUrl={p.headshotUrl}
-                  name={p.fullName}
-                />
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <span className="truncate font-semibold text-foreground">
-                      {p.fullName}
-                    </span>
-                    <span className="tnum shrink-0 text-xs text-muted-foreground">
-                      #{p.jerseyNumber}
-                    </span>
-                  </div>
-                  <p className="tnum mt-0.5 text-xs text-muted-foreground">
-                    {gated
-                      ? `${r.covered} of ${r.required} inputs`
-                      : `${r.inputs} ${r.inputs === 1 ? "input" : "inputs"}`}
-                    {drillKeys.map((key) => {
-                      const stat = p.drills[key];
-                      const drill = getDrill(template, key);
-                      if (!stat || !drill) return null;
-                      return (
-                        <span key={key}>
-                          {" "}
-                          &middot; {formatDrillValue(drill, stat.best)}
-                        </span>
-                      );
-                    })}
-                  </p>
-                </div>
-
-                <Dial rating={r.rating} size="sm" />
-              </Link>
-            </li>
-          );
-        })}
-      </ol>
-    </section>
   );
 }

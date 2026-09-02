@@ -75,7 +75,7 @@ export function Comments({
         Notes
       </h2>
 
-      <div className="mt-2 rounded-lg border border-border bg-card">
+      <div className="mt-2 bb-card rounded-lg border border-border bg-card">
         <div
           ref={scrollRef}
           className="max-h-80 overflow-y-auto px-4 py-3"

@@ -55,7 +55,7 @@ export function OnboardingChoice() {
       <button
         type="button"
         onClick={() => setPath("create")}
-        className="rounded-lg border border-border bg-card p-5 text-left active:bg-secondary"
+        className="bb-card rounded-lg border border-border bg-card p-5 text-left active:bg-secondary"
       >
         <p className="text-lg font-bold text-foreground">Create an organization</p>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -66,7 +66,7 @@ export function OnboardingChoice() {
       <button
         type="button"
         onClick={() => setPath("join")}
-        className="rounded-lg border border-border bg-card p-5 text-left active:bg-secondary"
+        className="bb-card rounded-lg border border-border bg-card p-5 text-left active:bg-secondary"
       >
         <p className="text-lg font-bold text-foreground">Join an organization</p>
         <p className="mt-1 text-sm text-muted-foreground">

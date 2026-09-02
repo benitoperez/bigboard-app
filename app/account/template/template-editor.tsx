@@ -94,7 +94,7 @@ function PositionsSection({
           const total = p.components.reduce((s, c) => s + c.weight, 0);
           const balanced = total === 100;
           return (
-            <li key={p.id} className="rounded-lg border border-border bg-card p-3">
+            <li key={p.id} className="bb-card rounded-lg border border-border bg-card p-3">
               <button
                 type="button"
                 onClick={() => setOpen(open === p.id ? null : p.id)}
@@ -146,7 +146,7 @@ function PositionsSection({
       </ul>
 
       {adding ? (
-        <div className="mt-2 rounded-lg border border-border bg-card p-3">
+        <div className="mt-2 bb-card rounded-lg border border-border bg-card p-3">
           <label htmlFor="new-pos-code" className="text-xs text-muted-foreground">
             Code (1-4 characters, e.g. WR)
           </label>
@@ -255,7 +255,7 @@ function AttributesSection({
         position the athlete plays gives it a weight.
       </p>
 
-      <ul className="mt-2 divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+      <ul className="mt-2 divide-y divide-border overflow-hidden bb-card rounded-lg border border-border bg-card">
         {template.attributes.map((a) => (
           <li key={a.id} className="flex items-center gap-3 px-3 py-2">
             <span className="tnum w-10 shrink-0 text-xs font-bold text-primary">
@@ -287,7 +287,7 @@ function AttributesSection({
       </ul>
 
       {adding ? (
-        <div className="mt-2 rounded-lg border border-border bg-card p-3">
+        <div className="mt-2 bb-card rounded-lg border border-border bg-card p-3">
           <label htmlFor="attr-label" className="text-xs text-muted-foreground">
             Name
           </label>
@@ -413,7 +413,7 @@ function DrillsSection({
         better lower, an exit velocity better higher.
       </p>
 
-      <ul className="mt-2 divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+      <ul className="mt-2 divide-y divide-border overflow-hidden bb-card rounded-lg border border-border bg-card">
         {template.drills.map((d) => (
           <li key={d.id} className="flex items-center gap-3 px-3 py-2">
             <div className="min-w-0 flex-1">
@@ -441,7 +441,7 @@ function DrillsSection({
       </ul>
 
       {adding ? (
-        <div className="mt-2 rounded-lg border border-border bg-card p-3">
+        <div className="mt-2 bb-card rounded-lg border border-border bg-card p-3">
           <label htmlFor="drill-label" className="text-xs text-muted-foreground">
             Name
           </label>
@@ -586,7 +586,7 @@ function GatingSection({
   const [value, setValue] = useState(template.minRatingsForDisplay);
 
   return (
-    <section className="rounded-lg border border-border bg-card p-4">
+    <section className="bb-card rounded-lg border border-border bg-card p-4">
       <h2 className="text-xs font-semibold tracking-[0.15em] text-muted-foreground uppercase">
         Rating Gate
       </h2>

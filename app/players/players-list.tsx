@@ -87,7 +87,7 @@ export function PlayersList({
         {visible.length} {visible.length === 1 ? "Athlete" : "Athletes"}
       </p>
 
-      <ul className="mt-2 divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+      <ul className="mt-2 divide-y divide-border overflow-hidden bb-card rounded-lg border border-border bg-card">
         {visible.map((p) => (
           <li key={p.id}>
             <Link

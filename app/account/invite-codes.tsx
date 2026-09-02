@@ -78,7 +78,7 @@ function CodeRow({
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card p-3">
+    <div className="bb-card rounded-lg border border-border bg-card p-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">

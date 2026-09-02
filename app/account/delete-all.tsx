@@ -37,7 +37,7 @@ export function DeleteAllProspects({ prospectCount }: { prospectCount: number })
 
   if (done !== null) {
     return (
-      <section className="mt-4 rounded-lg border border-border bg-card p-4">
+      <section className="mt-4 bb-card rounded-lg border border-border bg-card p-4">
         <h2 className="text-xl uppercase">Roster cleared</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Deleted <span className="tnum font-bold">{done}</span> prospects and
@@ -55,7 +55,7 @@ export function DeleteAllProspects({ prospectCount }: { prospectCount: number })
   }
 
   return (
-    <section className="mt-4 rounded-lg border border-destructive/30 bg-card p-4">
+    <section className="bb-card mt-4 rounded-lg border border-destructive/30 bg-card p-4">
       <h2 className="text-xl uppercase">Danger zone</h2>
 
       {!open ? (
