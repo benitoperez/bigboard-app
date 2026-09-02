@@ -6,6 +6,7 @@ import { getActiveTryout } from "@/lib/data/tryouts";
 import { tryoutPeriod } from "@/lib/tryouts";
 import { getSelections } from "@/lib/data/selections";
 import { boardOrder } from "@/lib/template";
+import { NoTryout } from "@/components/no-tryout";
 import { ratingColor, formatRating } from "@/lib/rating-color";
 import { Avatar } from "@/components/avatar";
 import { SelectToggle } from "@/components/select-toggle";
@@ -13,14 +14,14 @@ import { SelectToggle } from "@/components/select-toggle";
 export const metadata: Metadata = { title: "Selected - Big Board" };
 
 export default async function SelectedPage() {
-  await requireOrg();
+  const { is_admin, activeOrg } = await requireOrg();
 
   const tryout = await getActiveTryout();
   if (!tryout) {
     return (
       <main className="safe-top px-6 py-8">
         <h1 className="text-4xl tracking-tight uppercase">Selected</h1>
-        <p className="mt-6 text-sm text-muted-foreground">No active tryout.</p>
+        <NoTryout isAdmin={is_admin} orgName={activeOrg?.orgName ?? "This club"} />
       </main>
     );
   }

@@ -17,10 +17,17 @@ export type PositionOption = { code: string; label: string };
 export function AddAthlete({
   tryoutName,
   positions,
+  size = "normal",
 }: {
   tryoutName: string;
   /** The org template's positions, in board order. */
   positions: PositionOption[];
+  /**
+   * "large" is for an empty roster, where adding someone is the only thing
+   * worth doing on the screen. It shrinks back to "normal" once there is at
+   * least one athlete and the list itself is the point.
+   */
+  size?: "normal" | "large";
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -30,10 +37,15 @@ export function AddAthlete({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="min-h-tap shrink-0 rounded-md border border-border bg-card px-3 text-sm
-                   font-semibold text-foreground active:bg-secondary"
+        className={
+          size === "large"
+            ? "min-h-tap-large w-full rounded-lg bg-primary px-6 text-base font-bold " +
+              "tracking-wide text-primary-foreground active:opacity-80"
+            : "min-h-tap shrink-0 rounded-md border border-border bg-card px-3 text-sm " +
+              "font-semibold text-foreground active:bg-secondary"
+        }
       >
-        + Add
+        {size === "large" ? "+ Add an athlete" : "+ Add"}
       </button>
 
       {open && (

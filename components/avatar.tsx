@@ -31,9 +31,12 @@ export function Avatar({
 
   if (headshotUrl) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element -- Supabase Storage
-      // URLs are not known at build time and are already resized client-side
-      // to ~400px on upload (SPEC.md section 13).
+      // Supabase Storage URLs are not known at build time and are already
+      // resized client-side to ~400px on upload (SPEC.md section 13), so
+      // next/image would add a round trip and optimize an optimized file.
+      // The directive has to sit directly above the element - with the
+      // explanation between them it applied to a comment and did nothing.
+      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={headshotUrl}
         alt={name ?? `#${jerseyNumber}`}

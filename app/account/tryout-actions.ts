@@ -25,11 +25,12 @@ export async function createTryout(
   year: number | null,
   semester: string,
 ): Promise<TryoutResult> {
-  const { profile, is_admin } = await getOfficer();
+  const { profile, is_admin, activeOrg } = await getOfficer();
   if (!profile) return { ok: false, error: "Not signed in." };
   if (!is_admin) {
     return { ok: false, error: "Only an admin can create a tryout class." };
   }
+  if (!activeOrg) return { ok: false, error: "No active organization." };
 
   const trimmed = name.trim();
   if (!trimmed) return { ok: false, error: "Give the class a name." };
@@ -45,17 +46,40 @@ export async function createTryout(
 
   const supabase = await createClient();
 
+  // A tryout is the ROOT of the org tree - there is no parent row to derive
+  // org_id from, so unlike prospects and ratings it has no BEFORE INSERT
+  // trigger and must carry both ids itself. Omitting org_id leaves it null,
+  // app.is_admin(null) is not true, and the insert fails the RLS policy
+  // rather than the NOT NULL constraint - which reads as a permissions bug.
+  const { data: template } = await supabase
+    .from("templates")
+    .select("id")
+    .eq("org_id", activeOrg.orgId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (!template) {
+    return {
+      ok: false,
+      error: "This organization has no evaluation template to attach.",
+    };
+  }
+
   // Stand the new class down first, so there is never a moment with two
   // active classes for a screen to pick between.
   const { error: deactivateErr } = await supabase
     .from("tryouts")
     .update({ is_active: false })
+    .eq("org_id", activeOrg.orgId)
     .eq("is_active", true);
   if (deactivateErr) return { ok: false, error: deactivateErr.message };
 
   const { data, error } = await supabase
     .from("tryouts")
     .insert({
+      org_id: activeOrg.orgId,
+      template_id: template.id,
       name: trimmed,
       season_year: year,
       semester,
@@ -80,17 +104,22 @@ export async function createTryout(
  * arbitrarily.
  */
 export async function setActiveTryout(tryoutId: string): Promise<SwitchResult> {
-  const { profile, is_admin } = await getOfficer();
+  const { profile, is_admin, activeOrg } = await getOfficer();
   if (!profile) return { ok: false, error: "Not signed in." };
   if (!is_admin) {
     return { ok: false, error: "Only an admin can switch the active class." };
   }
+  if (!activeOrg) return { ok: false, error: "No active organization." };
 
   const supabase = await createClient();
 
+  // Scoped to THIS org. Without the filter, an admin of two orgs would
+  // stand down the other org's active class as a side effect of switching
+  // this one - RLS permits the write, so nothing would object.
   const { error: offErr } = await supabase
     .from("tryouts")
     .update({ is_active: false })
+    .eq("org_id", activeOrg.orgId)
     .eq("is_active", true);
   if (offErr) return { ok: false, error: offErr.message };
 
@@ -98,6 +127,7 @@ export async function setActiveTryout(tryoutId: string): Promise<SwitchResult> {
     .from("tryouts")
     .update({ is_active: true })
     .eq("id", tryoutId)
+    .eq("org_id", activeOrg.orgId)
     .select("id");
 
   if (error) return { ok: false, error: error.message };

@@ -5,21 +5,25 @@ import { getActiveTryout } from "@/lib/data/tryouts";
 import { tryoutPeriod } from "@/lib/tryouts";
 import { formatDrillValue, type Template } from "@/lib/template";
 import { BoardView } from "./board-view";
+import { NoTryout } from "@/components/no-tryout";
+import { AddAthlete } from "./players/add-athlete";
+import { boardOrder } from "@/lib/template";
 
 export default async function HomePage() {
   // Redirects to the screen that matches the failure: /login when signed
   // out, /confirm-email when unconfirmed, /onboarding when they belong to
   // no org. Every authenticated screen goes through this.
-  await requireOrg();
+  const { is_admin, is_evaluator, activeOrg } = await requireOrg();
 
   const tryout = await getActiveTryout();
   if (!tryout) {
     return (
-      <main className="safe-top px-6 py-8">
-        <h1 className="text-4xl tracking-tight uppercase">Big Board</h1>
-        <p className="mt-6 text-sm text-muted-foreground">
-          No active tryout yet.
+      <main className="safe-top safe-bottom px-6 py-8">
+        <p className="truncate text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
+          {activeOrg?.orgName}
         </p>
+        <h1 className="mt-1 text-4xl tracking-tight uppercase">Big Board</h1>
+        <NoTryout isAdmin={is_admin} orgName={activeOrg?.orgName ?? "This club"} />
       </main>
     );
   }
@@ -55,9 +59,28 @@ export default async function HomePage() {
       <KpiStrip template={template} prospects={prospects} />
 
       {prospects.length === 0 ? (
-        <p className="mt-8 text-sm text-muted-foreground">
-          No prospects yet. Import a roster from the Account screen.
-        </p>
+        /* A class with nobody in it. The boards would be a wall of empty
+           headings, so the next action goes here instead - and adding an
+           athlete is available to any evaluator, unlike the CSV import. */
+        <section className="bb-card mt-8 rounded-lg border border-border bg-card p-5">
+          <h2 className="text-xl text-foreground uppercase">Add your athletes</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {tryout.name} has no athletes yet. Add them one at a time here, or
+            import a roster CSV from the Account tab.
+          </p>
+          {is_evaluator && (
+            <div className="mt-4">
+              <AddAthlete
+                tryoutName={tryout.name}
+                positions={boardOrder(template).map((p) => ({
+                  code: p.code,
+                  label: p.label,
+                }))}
+                size="large"
+              />
+            </div>
+          )}
+        </section>
       ) : (
         <BoardView template={template} prospects={prospects} />
       )}

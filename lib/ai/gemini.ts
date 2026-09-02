@@ -18,8 +18,15 @@ import "server-only";
 
 const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 
-/** Overridable so a model deprecation is a config change, not a deploy. */
-const MODEL = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
+/**
+ * Overridable so a model retirement is a config change, not a deploy.
+ *
+ * This is not hypothetical: the first default here (gemini-2.0-flash) was
+ * already retired by the time the feature was switched on, and the API
+ * answered 404 with a message naming its replacement. Whatever is current
+ * when you read this, the env var is the way to move.
+ */
+const MODEL = process.env.GEMINI_MODEL ?? "gemini-3.6-flash";
 
 export type GeminiResult =
   | { ok: true; text: string }

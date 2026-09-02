@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getOfficer } from "@/lib/auth";
 import { isSemester, type Semester, type Tryout, type TryoutWithCount } from "@/lib/tryouts";
 
 export type { Semester, Tryout, TryoutWithCount };
@@ -42,11 +43,23 @@ function toTryout(r: Row): Tryout {
 
 const SELECT = "id, name, season_year, semester, tryout_date, is_active, created_at";
 
+/**
+ * The active class in the caller's ACTIVE org.
+ *
+ * The org filter is not redundant with RLS. RLS admits every org the user
+ * belongs to, so someone in two clubs would get whichever active class came
+ * back first - and switching orgs would appear to do nothing, because every
+ * screen would keep reading the other club's data.
+ */
 export async function getActiveTryout(): Promise<Tryout | null> {
+  const { activeOrg } = await getOfficer();
+  if (!activeOrg) return null;
+
   const supabase = await createClient();
   const { data } = await supabase
     .from("tryouts")
     .select(SELECT)
+    .eq("org_id", activeOrg.orgId)
     .eq("is_active", true)
     .order("created_at", { ascending: true })
     .limit(1)
@@ -62,15 +75,19 @@ export async function getActiveTryout(): Promise<Tryout | null> {
  * to draw the dropdown.
  */
 export async function getTryoutsWithCounts(): Promise<TryoutWithCount[]> {
+  const { activeOrg } = await getOfficer();
+  if (!activeOrg) return [];
+
   const supabase = await createClient();
 
   const [{ data: tryouts }, { data: prospects }] = await Promise.all([
     supabase
       .from("tryouts")
       .select(SELECT)
+      .eq("org_id", activeOrg.orgId)
       .order("season_year", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false }),
-    supabase.from("prospects").select("tryout_id"),
+    supabase.from("prospects").select("tryout_id").eq("org_id", activeOrg.orgId),
   ]);
 
   const counts = new Map<string, number>();
