@@ -195,8 +195,16 @@ function isCollision(row: ReviewRow, taken: Set<number>): boolean {
   return Number.isInteger(n) && taken.has(n);
 }
 
+/**
+ * min-w-0 is load-bearing, not decoration.
+ *
+ * A flex child will not shrink below its intrinsic content width unless it
+ * is allowed to, so `w-full` inputs in a flex row pushed the whole card past
+ * the right edge of a phone with no way to scroll back. min-w-0 lets them
+ * shrink to the space that exists.
+ */
 const FIELD =
-  "min-h-tap w-full rounded-md border border-border bg-input px-2 text-sm " +
+  "min-h-tap w-full min-w-0 rounded-md border border-border bg-input px-2 text-sm " +
   "text-foreground outline-none focus-visible:border-primary disabled:opacity-50";
 
 /** A field the AI was unsure about, highlighted so it gets looked at. */
@@ -242,10 +250,35 @@ function RowCard({
             : "border-border")
       }
     >
+      {/* Jersey beside the row number, names on the line below. Three
+          inputs abreast did not fit a phone even once they could shrink -
+          the names ended up too narrow to read what was in them. */}
       <div className="flex items-center gap-2">
         <span className="tnum w-6 shrink-0 text-xs text-muted-foreground">
           {index + 1}
         </span>
+        <input
+          value={row.jerseyNumber}
+          onChange={(e) => onChange({ jerseyNumber: e.target.value })}
+          disabled={disabled || skipped}
+          inputMode="numeric"
+          placeholder="#"
+          aria-label={`Row ${index + 1} jersey number`}
+          className={
+            "tnum w-16 shrink-0 text-center " +
+            FIELD +
+            (uncertain.has("jersey_number") ? FLAGGED : "")
+          }
+        />
+        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+          {row.firstName || row.lastName
+            ? `${row.firstName} ${row.lastName}`.trim()
+            : "no name read"}
+        </span>
+      </div>
+
+      <div className="mt-2 flex items-center gap-2">
+        <span className="w-6 shrink-0" aria-hidden="true" />
         <input
           value={row.firstName}
           onChange={(e) => onChange({ firstName: e.target.value })}
@@ -261,19 +294,6 @@ function RowCard({
           placeholder="Last"
           aria-label={`Row ${index + 1} last name`}
           className={FIELD + (uncertain.has("last_name") ? FLAGGED : "")}
-        />
-        <input
-          value={row.jerseyNumber}
-          onChange={(e) => onChange({ jerseyNumber: e.target.value })}
-          disabled={disabled || skipped}
-          inputMode="numeric"
-          placeholder="#"
-          aria-label={`Row ${index + 1} jersey number`}
-          className={
-            "tnum w-16 shrink-0 text-center " +
-            FIELD +
-            (uncertain.has("jersey_number") ? FLAGGED : "")
-          }
         />
       </div>
 
@@ -337,7 +357,7 @@ function RowCard({
                   inputMode="decimal"
                   placeholder="--"
                   aria-label={`Row ${index + 1} ${drill.label} attempt ${n + 1}`}
-                  className={"tnum w-16 shrink-0 text-center " + FIELD}
+                  className={"tnum w-14 shrink-0 text-center " + FIELD}
                 />
               ))}
             </div>

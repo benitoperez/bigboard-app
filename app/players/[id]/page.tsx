@@ -80,12 +80,15 @@ export default async function ProspectPage({
           </div>
 
           <div className="min-w-0 flex-1">
-            {/* First and last on their own lines. A single truncated line
-                cut surnames off entirely - "Brandon ..." identifies nobody
-                on a roster where several share a first name. */}
-            <h1 className="text-2xl leading-tight tracking-tight break-words uppercase">
-              <span className="block">{p.firstName}</span>
-              <span className="block">{p.lastName}</span>
+            {/* First and last on their own lines, across the FULL width left
+                by the photo. The dial used to sit on this line and squeezed
+                the column so hard that names broke mid-word, one or two
+                letters per line - "GAB / E / TAR / T". Identifying the
+                athlete is the header's first job, so the name gets the room
+                and the dial moved to its own row below. */}
+            <h1 className="text-2xl leading-tight tracking-tight uppercase">
+              <span className="block break-words">{p.firstName}</span>
+              <span className="block break-words">{p.lastName}</span>
             </h1>
             <div className="mt-3 flex flex-wrap items-center gap-1">
               <PositionChip
@@ -103,6 +106,12 @@ export default async function ProspectPage({
             </div>
           </div>
 
+        </div>
+
+        {/* The primary rating, on its own line and aligned right. It is the
+            headline number, so it stays big - but never at the cost of the
+            name being readable. */}
+        <div className="mt-3 flex justify-end">
           <PositionScore
             code={primaryRating.position}
             label={primaryRating.label}

@@ -71,7 +71,7 @@ export function ImportSheet({
             className="fixed inset-0 bg-background/85"
           />
 
-          <div className="bb-card-raised relative my-8 w-full max-w-md rounded-lg border border-border bg-popover p-4">
+          <div className="bb-card-raised relative my-8 w-full max-w-md overflow-x-hidden rounded-lg border border-border bg-popover p-4">
             <h2 className="text-xl text-foreground uppercase">Import roster</h2>
             <div className="mt-3">
               <ImportFlow
