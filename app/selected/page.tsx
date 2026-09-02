@@ -6,6 +6,7 @@ import { getActiveTryout } from "@/lib/data/tryouts";
 import { tryoutPeriod } from "@/lib/tryouts";
 import { getSelections } from "@/lib/data/selections";
 import { boardOrder } from "@/lib/template";
+import { compareForBoard } from "@/lib/ratings";
 import { NoTryout } from "@/components/no-tryout";
 import { ExportButton } from "@/app/account/export-button";
 import { ratingColor, formatRating } from "@/lib/rating-color";
@@ -46,12 +47,26 @@ export default async function SelectedPage() {
   const selectedIds = new Set(selections.map((s) => s.prospectId));
   const selected = prospects.filter((p) => selectedIds.has(p.id));
 
-  // Segmented by PRIMARY position, in the template's board order.
+  // Segmented by PRIMARY position in the template's board order, and within
+  // each group ranked by overall rating rather than jersey number.
+  //
+  // Sorted on RAW, never the 45-99 display band: the band compresses real
+  // gaps, so two athletes can share a display number while one is genuinely
+  // ahead, and sorting on it would present that as a tie (SPEC.md §8).
+  // Gated athletes fall to the bottom of their own group rather than being
+  // hidden - they are on the team list, so hiding them here would lose them.
   const byPosition = boardOrder(template)
     .map((position) => ({
       position: position.code,
       label: position.label,
-      rows: selected.filter((p) => p.primaryPosition === position.code),
+      rows: selected
+        .filter((p) => p.primaryPosition === position.code)
+        .sort((a, b) =>
+          compareForBoard(
+            { raw: a.primary.raw, jerseyNumber: a.jerseyNumber },
+            { raw: b.primary.raw, jerseyNumber: b.jerseyNumber },
+          ),
+        ),
     }))
     .filter((g) => g.rows.length > 0);
 
