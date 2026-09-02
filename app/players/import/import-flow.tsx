@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Papa from "papaparse";
+import * as XLSX from "xlsx";
 import type { Template } from "@/lib/template";
 import { validateRoster } from "@/lib/csv/roster";
 import { prepareImport, type ReviewRow } from "./actions";
@@ -59,28 +60,20 @@ export function ImportFlow({
     setStage({ kind: "error", message });
   }
 
-  // ---------------------------------------------------------------- CSV
+  // ------------------------------------------------------- CSV / Excel
 
-  function onCsv(e: React.ChangeEvent<HTMLInputElement>) {
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setStage({ kind: "working", message: `Reading ${file.name}...` });
 
-    Papa.parse<Record<string, unknown>>(file, {
-      header: true,
-      skipEmptyLines: false,
-      complete: (parsed) => {
-        const headers = parsed.meta.fields ?? [];
+    parseSpreadsheet(file)
+      .then(({ records, headers }) => {
         // Validated with an EMPTY taken-set: collisions are a per-row choice
         // in the review table now, not a whole-file rejection. Everything
         // else - bad positions, unparseable times - still fails here, where
         // the message can name the line.
-        const result = validateRoster(
-          parsed.data,
-          headers,
-          new Set<number>(),
-          template,
-        );
+        const result = validateRoster(records, headers, new Set<number>(), template);
 
         if (!result.ok) {
           fail(
@@ -110,9 +103,12 @@ export function ImportFlow({
             mode: takenJerseys.includes(r.jersey_number) ? "skip" : "insert",
           })),
         });
-      },
-      error: (err: Error) => fail(`Could not read the file: ${err.message}`),
-    });
+      })
+      .catch((err: unknown) =>
+        fail(
+          `Could not read the file: ${err instanceof Error ? err.message : "unknown error"}`,
+        ),
+      );
   }
 
   // ------------------------------------------------------------- AI paths
@@ -250,8 +246,8 @@ export function ImportFlow({
         <label className="bb-card flex min-h-tap-large cursor-pointer flex-col justify-center rounded-lg border border-border bg-card px-4 py-3 active:bg-secondary">
           <input
             type="file"
-            accept=".csv,text/csv,.xlsx,.xls"
-            onChange={onCsv}
+            accept=".csv,text/csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+            onChange={onFile}
             className="sr-only"
           />
           <span className="text-sm font-bold text-foreground">
@@ -492,4 +488,59 @@ async function toResizedDataUrl(file: File): Promise<string> {
     throw new Error("That image is still over 5MB after resizing.");
   }
   return url;
+}
+
+/**
+ * A CSV or an Excel workbook, as header-keyed records.
+ *
+ * Both land in the SAME shape papaparse produces, so the validator and the
+ * review table never know which one they got. Excel goes through SheetJS,
+ * first sheet only, and every cell is read as text: a jersey number typed
+ * as 17 must not arrive as the number 17.0, and a 40 time as a float would
+ * pick up binary noise in its last digits.
+ *
+ * A file is treated as Excel by extension, not by MIME type - browsers
+ * report .xlsx files inconsistently, and an .xlsx with an empty MIME type
+ * is common enough on phones to matter.
+ */
+async function parseSpreadsheet(
+  file: File,
+): Promise<{ records: Record<string, unknown>[]; headers: string[] }> {
+  const isExcel = /\.xlsx?$/i.test(file.name);
+
+  if (!isExcel) {
+    return new Promise((resolve, reject) => {
+      Papa.parse<Record<string, unknown>>(file, {
+        header: true,
+        skipEmptyLines: false, // blank rows are counted, not silently dropped
+        complete: (parsed) =>
+          resolve({ records: parsed.data, headers: parsed.meta.fields ?? [] }),
+        error: (err: Error) => reject(err),
+      });
+    });
+  }
+
+  const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) throw new Error("The workbook has no sheets.");
+
+  // raw:false renders every cell to its displayed text, which is exactly
+  // what a person typing it into a CSV would have produced.
+  const grid = XLSX.utils.sheet_to_json<string[]>(workbook.Sheets[sheetName], {
+    header: 1,
+    raw: false,
+    defval: "",
+  });
+
+  const [headerRow, ...body] = grid;
+  const headers = (headerRow ?? []).map((h) => String(h ?? "").trim());
+  if (headers.every((h) => h === "")) {
+    throw new Error("The first row of the sheet is empty. It should hold the column names.");
+  }
+
+  const records = body.map((row) =>
+    Object.fromEntries(headers.map((h, i) => [h, String(row?.[i] ?? "")])),
+  );
+
+  return { records, headers };
 }

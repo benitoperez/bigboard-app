@@ -91,7 +91,7 @@ Used outdoors in direct sunlight, one-handed, often gloved.
 
 ## 8. Git workflow
 
-Remote is `benitoperez/Player-Eval-Project` on `main`.
+Remote is `benitoperez/bigboard-app` on `main`.
 
 **Commit with a clear message and push after completing each numbered build
 step** from SPEC-V2.md section 10. One commit per step, not per file.

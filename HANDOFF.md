@@ -16,7 +16,7 @@ Excel sheet.
 
 | | |
 |---|---|
-| Repo | `benitoperez/Player-Eval-Project`, branch `main`, **private** |
+| Repo | `benitoperez/bigboard-app` (renamed from Player-Eval-Project), branch `main` |
 | Stack | Next.js 16.3.3 (App Router), React 19.2.8, TypeScript, Tailwind **v4** |
 | Database | Supabase Postgres 17, project ref `qmcjtynomaezbcjdbxzk` |
 | Hosting | Vercel, auto-deploys from `main` |
