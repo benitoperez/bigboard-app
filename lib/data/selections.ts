@@ -18,12 +18,12 @@ export async function getSelections(tryoutId: string): Promise<Selection[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("selections")
-    .select("prospect_id, selected_by, created_at, officers(display_name)")
+    .select("prospect_id, selected_by, created_at, profiles(display_name)")
     .eq("tryout_id", tryoutId)
     .order("created_at", { ascending: true });
 
   return (data ?? []).map((s) => {
-    const officer = s.officers as unknown as { display_name: string } | null;
+    const officer = s.profiles as unknown as { display_name: string } | null;
     return {
       prospectId: s.prospect_id,
       selectedBy: s.selected_by,

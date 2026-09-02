@@ -73,8 +73,16 @@ export async function generate(
   }
 
   if (!response.ok) {
-    // Never surface the provider's body: it can echo request content and, on
-    // an auth failure, describe the key.
+    // The provider's body never reaches the client - it can echo request
+    // content and, on an auth failure, describe the key. It DOES go to the
+    // server log, because "could not be reached" is untriageable otherwise
+    // and this is the only place the real reason exists. Vercel:
+    // Deployments -> the deployment -> Logs.
+    const detail = await response.text().catch(() => "");
+    console.error(
+      `[gemini] ${MODEL} -> HTTP ${response.status}: ${detail.slice(0, 500)}`,
+    );
+
     const status = response.status === 429 ? 429 : 502;
     return {
       ok: false,

@@ -14,12 +14,12 @@ export async function getComments(prospectId: string): Promise<Comment[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("comments")
-    .select("id, officer_id, body, created_at, officers(display_name)")
+    .select("id, officer_id, body, created_at, profiles(display_name)")
     .eq("prospect_id", prospectId)
     .order("created_at", { ascending: true });
 
   return (data ?? []).map((c) => {
-    const officer = c.officers as unknown as { display_name: string } | null;
+    const officer = c.profiles as unknown as { display_name: string } | null;
     return {
       id: c.id,
       officerId: c.officer_id,

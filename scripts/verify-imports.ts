@@ -32,6 +32,16 @@ const SERVER_MARKERS = ["next/headers", "@/lib/supabase/server", "server-only"];
  */
 const SECRET_ENV = "GEMINI_API_KEY";
 
+/**
+ * Tables v2 removed or renamed.
+ *
+ * A stale name is not a type error - the query string is just text, and
+ * PostgREST fails at RUNTIME. `officers` survived the v2 rename in two data
+ * modules and broke comments and the Selected screen with no build warning
+ * at all, so the names are checked here instead of remembered.
+ */
+const DEAD_TABLES = ["officers"];
+
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
     if (entry === "node_modules" || entry.startsWith(".")) continue;
@@ -170,6 +180,28 @@ for (const [file, text] of source) {
 ` +
         `        The browser must only call this app's own /api/ai routes.`,
     );
+  }
+}
+
+// --- no query may name a table v2 renamed away -------------------------
+for (const [file, text] of source) {
+  for (const dead of DEAD_TABLES) {
+    // Both ways a query can name a table: `.from("officers")` and the
+    // PostgREST embed form `officers(display_name)`. Plain string checks
+    // rather than a built regex - the names are literals, and a regex here
+    // is only a chance to get the escaping wrong.
+    const named =
+      text.includes(`.from("${dead}")`) ||
+      text.includes(`.from('${dead}')`) ||
+      text.includes(`${dead}(`);
+
+    if (named) {
+      problems.push(
+        `${rel(file)}\n` +
+          `        queries "${dead}", which v2 renamed. PostgREST fails at\n` +
+          `        RUNTIME on a stale table name - nothing catches it at build.`,
+      );
+    }
   }
 }
 
