@@ -72,6 +72,8 @@ export default async function HomePage() {
             <div className="mt-4">
               <AddAthlete
                 tryoutName={tryout.name}
+                tryoutId={tryout.id}
+                orgId={activeOrg!.orgId}
                 positions={boardOrder(template).map((p) => ({
                   code: p.code,
                   label: p.label,

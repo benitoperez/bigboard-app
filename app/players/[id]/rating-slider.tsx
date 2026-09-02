@@ -173,7 +173,7 @@ function TeamRating({ attribute }: { attribute: AttributeDetail }) {
   return (
     <div className="shrink-0 text-center">
       <div
-        className="flex h-12 w-12 items-center justify-center rounded-full border-2 bg-secondary"
+        className="bb-attr-dial flex h-12 w-12 items-center justify-center rounded-full border-2 bg-secondary"
         style={{ borderColor: color }}
       >
         <span className="tnum text-base font-bold" style={{ color }}>

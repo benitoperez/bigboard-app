@@ -286,6 +286,27 @@
   text-shadow: 0 1px 2px rgb(0 0 0 / 0.45);
 }
 
+/*
+ * Rating dials.
+ *
+ * The shadow goes on the SVG's drawn strokes rather than the box, so the
+ * arc lifts off the card instead of a square shadow appearing behind a
+ * round object.
+ */
+.bb-dial svg {
+  filter: drop-shadow(0 2px 4px rgb(0 0 0 / 0.55));
+}
+
+/*
+ * The per-attribute team-rating circles beside each slider. Same lift as
+ * the dials so the two kinds of score read as one family.
+ */
+.bb-attr-dial {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    0 2px 5px rgb(0 0 0 / 0.5);
+}
+
 /* Headshots get the same lift, so the two kinds sit at one depth. */
 .bb-avatar-photo {
   box-shadow:

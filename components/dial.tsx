@@ -43,7 +43,7 @@ export function Dial({
   const color = ratingColor(rating);
 
   return (
-    <div className="flex shrink-0 flex-col items-center">
+    <div className="bb-dial flex shrink-0 flex-col items-center">
       <div className="relative" style={{ width: box, height: box }}>
         <svg
           width={box}

@@ -57,6 +57,8 @@ export default async function PlayersPage() {
         {is_evaluator && prospects.length > 0 && (
           <AddAthlete
             tryoutName={tryout.name}
+            tryoutId={tryout.id}
+            orgId={activeOrg!.orgId}
             positions={boardOrder(template).map((p) => ({
               code: p.code,
               label: p.label,
@@ -77,6 +79,8 @@ export default async function PlayersPage() {
             <div className="mt-4">
               <AddAthlete
                 tryoutName={tryout.name}
+                tryoutId={tryout.id}
+                orgId={activeOrg!.orgId}
                 positions={boardOrder(template).map((p) => ({
                   code: p.code,
                   label: p.label,

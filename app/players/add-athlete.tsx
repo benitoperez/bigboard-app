@@ -1,8 +1,16 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addAthlete } from "./add-actions";
+import { setHeadshotPath } from "./[id]/headshot-actions";
+import { createClient } from "@/lib/supabase/client";
+import {
+  HEADSHOT_MAX_EDGE,
+  formatBytes,
+  headshotPath,
+  prepareHeadshot,
+} from "@/lib/images";
 
 /**
  * Add an athlete by hand, for anyone who turns up who was not on the imported
@@ -16,10 +24,15 @@ export type PositionOption = { code: string; label: string };
 
 export function AddAthlete({
   tryoutName,
+  tryoutId,
+  orgId,
   positions,
   size = "normal",
 }: {
   tryoutName: string;
+  /** Needed to build the headshot storage path if a photo is attached. */
+  tryoutId: string;
+  orgId: string;
   /** The org template's positions, in board order. */
   positions: PositionOption[];
   /**
@@ -51,6 +64,8 @@ export function AddAthlete({
       {open && (
         <AddSheet
           tryoutName={tryoutName}
+          tryoutId={tryoutId}
+          orgId={orgId}
           positions={positions}
           onClose={() => setOpen(false)}
           onAdded={() => {
@@ -65,11 +80,15 @@ export function AddAthlete({
 
 function AddSheet({
   tryoutName,
+  tryoutId,
+  orgId,
   positions,
   onClose,
   onAdded,
 }: {
   tryoutName: string;
+  tryoutId: string;
+  orgId: string;
   positions: PositionOption[];
   onClose: () => void;
   onAdded: () => void;
@@ -81,6 +100,39 @@ function AddSheet({
   const [secondary, setSecondary] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // The photo is held locally until the athlete exists. The storage path is
+  // keyed on the prospect id, which does not exist until the insert
+  // succeeds - so this is deliberately a two-step, not one upload.
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const photoInput = useRef<HTMLInputElement>(null);
+
+  function choosePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setPhoto(file);
+    setPhotoPreview((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return file ? URL.createObjectURL(file) : null;
+    });
+  }
+
+  function clearPhoto() {
+    setPhoto(null);
+    setPhotoPreview((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return null;
+    });
+    if (photoInput.current) photoInput.current.value = "";
+  }
+
+  // Object URLs are a manual allocation; letting them pile up leaks the
+  // whole image per pick.
+  useEffect(() => {
+    return () => {
+      if (photoPreview) URL.revokeObjectURL(photoPreview);
+    };
+  }, [photoPreview]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -114,6 +166,35 @@ function AddSheet({
         setError(res.error);
         return;
       }
+
+      // The athlete is saved at this point. A photo failure must NOT undo
+      // that - a roster entry without a picture is fine, and SPEC.md
+      // section 13 is explicit that nothing blocks on a photo existing. So
+      // the sheet closes either way and the error is reported after.
+      if (photo) {
+        try {
+          const prepared = await prepareHeadshot(photo, HEADSHOT_MAX_EDGE);
+          const path = headshotPath(orgId, tryoutId, res.id);
+          const supabase = createClient();
+          const { error: upErr } = await supabase.storage
+            .from("headshots")
+            .upload(path, prepared.blob, {
+              contentType: "image/jpeg",
+              upsert: true,
+            });
+          if (upErr) throw new Error(upErr.message);
+
+          const saved = await setHeadshotPath(res.id, path);
+          if (!saved.ok) throw new Error(saved.error);
+        } catch (err) {
+          setError(
+            (err instanceof Error ? err.message : "The photo did not upload.") +
+              " The athlete was still added - add the photo from their profile.",
+          );
+          return;
+        }
+      }
+
       onAdded();
     });
   }
@@ -239,6 +320,59 @@ function AddSheet({
             );
           })}
         </div>
+
+        {/* Photo last, and optional. Adding it here saves walking back to
+            the profile for every athlete, but nothing waits on it: the
+            athlete is created first and the upload follows. */}
+        <p className="mt-4 text-sm text-muted-foreground">Photo (optional)</p>
+        <div className="mt-1 flex items-center gap-3">
+          <label
+            className={
+              "flex min-h-tap flex-1 cursor-pointer items-center justify-center rounded-md " +
+              "border border-dashed border-border-strong px-3 text-xs font-semibold " +
+              (pending ? "opacity-50" : "text-foreground active:bg-secondary")
+            }
+          >
+            <input
+              ref={photoInput}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={choosePhoto}
+              disabled={pending}
+              className="sr-only"
+            />
+            {photo ? "Change photo" : "Take or choose a photo"}
+          </label>
+
+          {photoPreview && (
+            <div className="relative shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={photoPreview}
+                alt=""
+                className="bb-avatar-photo h-11 w-11 rounded-full object-cover"
+              />
+              <button
+                type="button"
+                onClick={clearPhoto}
+                disabled={pending}
+                aria-label="Remove photo"
+                className="bb-card absolute -top-1 -right-1 flex h-5 w-5 items-center
+                           justify-center rounded-full border border-border bg-card
+                           text-[10px] text-muted-foreground disabled:opacity-50"
+              >
+                &times;
+              </button>
+            </div>
+          )}
+        </div>
+        {photo && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {formatBytes(photo.size)} &mdash; resized to about 400px before
+            upload.
+          </p>
+        )}
 
         {error && (
           <p role="alert" className="mt-3 text-sm font-semibold text-destructive">

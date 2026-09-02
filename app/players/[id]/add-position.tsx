@@ -63,19 +63,26 @@ export function AddPosition({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-label="Add a position"
-        disabled={pending}
-        className="flex h-11 w-11 items-center justify-center rounded-md border border-dashed
-                   border-border-strong text-xl leading-none text-muted-foreground
-                   active:bg-secondary disabled:opacity-50"
-      >
-        +
-      </button>
+      {/* Mirrors a PositionScore exactly - a 56px tile with an 11px caption
+          under it - so this sits IN the row of secondary dials instead of
+          floating beside them at a different height. */}
+      <div className="shrink-0 text-center">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-label="Add a position"
+          disabled={pending}
+          title="Add a position"
+          className="flex h-14 w-14 items-center justify-center rounded-full border
+                     border-dashed border-border-strong text-muted-foreground
+                     active:bg-secondary disabled:opacity-50"
+        >
+          <PersonPlusIcon />
+        </button>
+        <p className="mt-1 text-[11px] text-muted-foreground">Add</p>
+      </div>
 
       {open && (
         <div
@@ -137,5 +144,32 @@ export function AddPosition({
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * A person with a plus, matching the athlete iconography elsewhere.
+ *
+ * Sized and stacked to match a PositionScore so the control sits IN the row
+ * of dials rather than beside it - a bare "+" square at a different height
+ * read as an unrelated button.
+ */
+function PersonPlusIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M15 20v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M18 8v6M21 11h-6" />
+    </svg>
   );
 }

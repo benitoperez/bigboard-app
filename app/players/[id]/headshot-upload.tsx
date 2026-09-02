@@ -102,48 +102,81 @@ export function HeadshotUpload({
   }
 
   return (
-    <div className="mt-3">
-      <div className="flex gap-2">
-        <label
+    <>
+      {/*
+        A pencil badge on the corner of the photo, not a bar under it.
+        Editing a headshot is a rare, obvious action and it belongs ON the
+        thing it edits - the full-width "Replace photo" bar was spending a
+        row of a phone header on it.
+      */}
+      <label
+        aria-label={hasHeadshot ? "Replace photo" : "Add photo"}
+        title={hasHeadshot ? "Replace photo" : "Add photo"}
+        className={
+          "bb-card absolute -right-1 -bottom-1 flex h-8 w-8 cursor-pointer items-center " +
+          "justify-center rounded-full border border-border bg-card text-foreground " +
+          (busy ? "opacity-50" : "active:bg-secondary")
+        }
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={onFile}
+          disabled={busy}
+          className="sr-only"
+        />
+        <PencilIcon />
+      </label>
+
+      {/* Removal is destructive and rare, so it stays out of the badge and
+          only appears once there is something to remove. */}
+      {hasHeadshot && (
+        <button
+          type="button"
+          onClick={onRemove}
+          disabled={busy}
+          aria-label="Remove photo"
+          title="Remove photo"
+          className="bb-card absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center
+                     rounded-full border border-border bg-card text-xs text-muted-foreground
+                     disabled:opacity-50"
+        >
+          &times;
+        </button>
+      )}
+
+      {(status || error) && (
+        <p
+          role={error ? "alert" : undefined}
           className={
-            "flex min-h-tap flex-1 cursor-pointer items-center justify-center rounded-md " +
-            "border border-dashed border-border-strong px-3 text-xs font-semibold " +
-            (busy ? "opacity-50" : "text-foreground active:bg-secondary")
+            "absolute top-full left-0 mt-1 w-40 text-[11px] " +
+            (error ? "text-destructive" : "text-muted-foreground")
           }
         >
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={onFile}
-            disabled={busy}
-            className="sr-only"
-          />
-          {hasHeadshot ? "Replace photo" : "Add photo"}
-        </label>
-
-        {hasHeadshot && (
-          <button
-            type="button"
-            onClick={onRemove}
-            disabled={busy}
-            className="min-h-tap rounded-md border border-border px-3 text-xs font-semibold
-                       text-muted-foreground disabled:opacity-50"
-          >
-            Remove
-          </button>
-        )}
-      </div>
-
-      {status && (
-        <p className="mt-1 text-xs text-muted-foreground">{status}</p>
-      )}
-      {error && (
-        <p role="alert" className="mt-1 text-xs text-destructive">
-          {error}
+          {error ?? status}
         </p>
       )}
-    </div>
+    </>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
   );
 }

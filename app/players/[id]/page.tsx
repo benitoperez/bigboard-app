@@ -47,6 +47,9 @@ export default async function ProspectPage({
 
       {/* ---- Header (SPEC.md section 10.3) ---- */}
       <header className="mt-2 bb-card rounded-lg border border-border bg-card p-4">
+        {/* Row 1: photo, identity, primary rating. The rating sits hard
+            right because it is the answer the screen exists to give - the
+            eye lands on the name, then the number, without a detour. */}
         <div className="flex items-start gap-4">
           <div className="relative shrink-0">
             <Avatar
@@ -58,6 +61,17 @@ export default async function ProspectPage({
             <span className="tnum absolute -top-1 -left-1 rounded bg-background px-1.5 text-xs font-bold text-foreground">
               #{p.jerseyNumber}
             </span>
+
+            {/* The pencil badge lives on the photo itself. */}
+            {tryout && is_evaluator && (
+              <HeadshotUpload
+                prospectId={p.id}
+                tryoutId={tryout.id}
+                hasHeadshot={p.headshotPath !== null}
+                currentPath={p.headshotPath}
+                orgId={activeOrg!.orgId}
+              />
+            )}
           </div>
 
           <div className="min-w-0 flex-1">
@@ -78,24 +92,8 @@ export default async function ProspectPage({
                 />
               ))}
             </div>
-
-            {/* SPEC.md section 10.4: the add control also lives here. */}
-            {is_evaluator && (
-            <div className="mt-3 flex items-center gap-2">
-              <SelectToggle
-                prospectId={p.id}
-                prospectName={p.fullName}
-                initialSelected={selectedIds.has(p.id)}
-                size="lg"
-              />
-              <span className="text-xs text-muted-foreground">
-                {selectedIds.has(p.id) ? "On the team list" : "Add to team list"}
-              </span>
-            </div>
-            )}
           </div>
 
-          {/* Primary position dial, larger than the secondaries. */}
           <PositionScore
             code={primaryRating.position}
             rating={primaryRating.rating.rating}
@@ -107,40 +105,57 @@ export default async function ProspectPage({
           />
         </div>
 
-        {/* Secondary positions, each with its own independent input count. */}
-        <div className="mt-4 flex flex-wrap items-start gap-3">
-          {secondaryRatings.map((r) => (
-            <PositionScore
-              key={r.position}
-              code={r.position}
-              rating={r.rating.rating}
-              inputs={r.rating.inputs}
-              covered={r.rating.covered}
-              required={r.rating.required}
-              missing={r.missing}
+        {/* Row 2: the team-list toggle, full width and horizontal, in the
+            slot the "Replace photo" bar used to occupy. It is the one
+            decision an officer makes from this header, so it gets a row of
+            its own rather than being tucked beside the name. */}
+        {is_evaluator && (
+          <div className="bb-card mt-4 flex min-h-tap-large items-center gap-3 rounded-lg border border-border bg-secondary px-3">
+            <SelectToggle
+              prospectId={p.id}
+              prospectName={p.fullName}
+              initialSelected={selectedIds.has(p.id)}
+              size="lg"
             />
-          ))}
-          {is_evaluator && (
-          <AddPosition
-            prospectId={p.id}
-            taken={[p.primaryPosition, ...p.secondaryPositions]}
-            positions={template.positions
-              .slice()
-              .sort((a, b) => a.sortOrder - b.sortOrder)
-              .map((tp) => ({ code: tp.code, label: tp.label }))}
-          />
-          )}
-        </div>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-foreground">
+                {selectedIds.has(p.id) ? "On the team list" : "Not on the team list"}
+              </span>
+              <span className="block truncate text-xs text-muted-foreground">
+                {selectedIds.has(p.id)
+                  ? "Everyone sees them on the Selected tab"
+                  : "Tap to add them for the whole staff"}
+              </span>
+            </span>
+          </div>
+        )}
 
-        {/* SPEC.md section 13: optional, and nothing blocks on it. */}
-        {tryout && is_evaluator && (
-          <HeadshotUpload
-            prospectId={p.id}
-            tryoutId={tryout.id}
-            hasHeadshot={p.headshotPath !== null}
-            currentPath={p.headshotPath}
-            orgId={activeOrg!.orgId}
-          />
+        {/* Row 3: secondary positions and the add control, aligned as one
+            row of equal-height tiles. */}
+        {(secondaryRatings.length > 0 || is_evaluator) && (
+          <div className="mt-4 flex flex-wrap items-start gap-3">
+            {secondaryRatings.map((r) => (
+              <PositionScore
+                key={r.position}
+                code={r.position}
+                rating={r.rating.rating}
+                inputs={r.rating.inputs}
+                covered={r.rating.covered}
+                required={r.rating.required}
+                missing={r.missing}
+              />
+            ))}
+            {is_evaluator && (
+              <AddPosition
+                prospectId={p.id}
+                taken={[p.primaryPosition, ...p.secondaryPositions]}
+                positions={template.positions
+                  .slice()
+                  .sort((a, b) => a.sortOrder - b.sortOrder)
+                  .map((tp) => ({ code: tp.code, label: tp.label }))}
+              />
+            )}
+          </div>
         )}
 
         {/* Measurement strip. Styled apart from the dials on purpose: these
