@@ -7,21 +7,19 @@ import { switchOrg } from "@/app/onboarding/actions";
 import { deleteOrg, leaveOrg, renameOrg } from "./org-actions";
 
 /**
- * Org identity, switching, and the leave/rename controls — SPEC-V2.md §5.
+ * Org identity and switching — SPEC-V2.md §5.
  *
- * Everyone sees the org name, the switcher (when they belong to more than
- * one), and Leave. Rename is admin+. Delete is owner-only and lives in the
- * owner section below.
+ * Everyone sees the org name and the switcher (when they belong to more than
+ * one). Rename is admin+. Leaving and deleting are destructive, so they live
+ * together in the Danger Zone below rather than here.
  */
 export function OrgPanel({
   activeOrg,
   memberships,
-  role,
   isAdmin,
 }: {
   activeOrg: Membership;
   memberships: Membership[];
-  role: Role;
   isAdmin: boolean;
 }) {
   const router = useRouter();
@@ -29,7 +27,6 @@ export function OrgPanel({
   const [error, setError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(activeOrg.orgName);
-  const [leaving, setLeaving] = useState(false);
 
   function run(fn: () => Promise<{ ok: boolean; error?: string }>, after?: () => void) {
     setError(null);
@@ -45,10 +42,10 @@ export function OrgPanel({
   }
 
   return (
-    <section className="mt-4 bb-card rounded-lg border border-border bg-card p-4">
-      <h2 className="text-xs font-semibold tracking-[0.15em] text-muted-foreground uppercase">
-        Organization
-      </h2>
+    <div className="bb-card rounded-lg border border-border bg-card p-4">
+      <p className="text-xs font-semibold tracking-[0.15em] text-muted-foreground uppercase">
+        Name
+      </p>
 
       {renaming ? (
         <div className="mt-2 flex flex-col gap-2">
@@ -95,7 +92,8 @@ export function OrgPanel({
             <button
               type="button"
               onClick={() => setRenaming(true)}
-              className="min-h-tap shrink-0 text-xs font-semibold text-muted-foreground"
+              className="min-h-tap shrink-0 rounded-md border border-border px-3 text-xs
+                         font-semibold text-muted-foreground active:bg-secondary"
             >
               Rename
             </button>
@@ -105,10 +103,10 @@ export function OrgPanel({
 
       {/* Only worth showing to someone who actually belongs to several. */}
       {memberships.length > 1 && (
-        <div className="mt-3">
+        <div className="mt-4 border-t border-border pt-4">
           <label
             htmlFor="org-switch"
-            className="text-xs font-semibold text-muted-foreground"
+            className="text-xs font-semibold tracking-[0.15em] text-muted-foreground uppercase"
           >
             Switch organization
           </label>
@@ -138,52 +136,103 @@ export function OrgPanel({
           {error}
         </p>
       )}
+    </div>
+  );
+}
 
-      {/* The owner cannot leave. Saying why beats a disabled button. */}
-      <div className="mt-3 border-t border-border pt-3">
-        {role === "owner" ? (
-          <p className="text-xs text-muted-foreground">
-            As owner you cannot leave. Transfer ownership to someone else
-            first.
-          </p>
-        ) : leaving ? (
-          <div>
-            <p className="text-xs text-foreground">
-              Leave {activeOrg.orgName}? Your ratings and comments stay with
-              the club. You would need a new invite code to come back.
-            </p>
-            <div className="mt-2 flex gap-2">
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => run(() => leaveOrg())}
-                className="min-h-tap rounded-md border border-destructive/40 px-3 text-xs
-                           font-semibold text-destructive active:bg-destructive/10 disabled:opacity-50"
-              >
-                {pending ? "Leaving..." : "Leave"}
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => setLeaving(false)}
-                className="min-h-tap rounded-md border border-border px-3 text-xs
-                           font-semibold text-muted-foreground disabled:opacity-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
+/**
+ * One row of the Danger Zone card: a title, what it does, and its control.
+ * Shared so leave, clear-roster and delete read as one consistent list.
+ */
+export function DangerRow({
+  title,
+  blurb,
+  children,
+}: {
+  title: string;
+  blurb: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="p-4">
+      <p className="text-base font-bold text-foreground">{title}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{blurb}</p>
+      {children && <div className="mt-3">{children}</div>}
+    </div>
+  );
+}
+
+/**
+ * Leave the active org. The owner cannot leave; saying why beats a disabled
+ * button.
+ */
+export function LeaveOrg({ orgName, role }: { orgName: string; role: Role }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
+
+  if (role === "owner") {
+    return (
+      <DangerRow
+        title="Leave organization"
+        blurb="As owner you cannot leave. Make someone else the owner from the members list first."
+      />
+    );
+  }
+
+  return (
+    <DangerRow
+      title="Leave organization"
+      blurb="Your ratings and comments stay with the club. You would need a new invite code to come back."
+    >
+      {leaving ? (
+        <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => setLeaving(true)}
-            className="min-h-tap text-xs font-semibold text-muted-foreground"
+            disabled={pending}
+            onClick={() => {
+              setError(null);
+              startTransition(async () => {
+                const res = await leaveOrg();
+                if (!res.ok) {
+                  setError(res.error ?? "That did not work.");
+                  return;
+                }
+                router.refresh();
+              });
+            }}
+            className="min-h-tap flex-1 rounded-md bg-destructive px-4 text-sm font-bold
+                       text-destructive-foreground disabled:opacity-50"
           >
-            Leave this organization
+            {pending ? "Leaving..." : `Leave ${orgName}`}
           </button>
-        )}
-      </div>
-    </section>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => setLeaving(false)}
+            className="min-h-tap flex-1 rounded-md border border-border px-4 text-sm
+                       font-semibold text-muted-foreground disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setLeaving(true)}
+          className="min-h-tap w-full rounded-md border border-destructive/40 px-4 text-sm
+                     font-semibold text-destructive active:bg-destructive/10"
+        >
+          Leave this organization
+        </button>
+      )}
+      {error && (
+        <p role="alert" className="mt-2 text-xs text-destructive">
+          {error}
+        </p>
+      )}
+    </DangerRow>
   );
 }
 
@@ -194,7 +243,7 @@ export function OrgPanel({
  * result, selection, comment and headshot it ever held. Typing the name is
  * the gate, and the RPC re-checks ownership regardless.
  */
-export function DeleteOrgPanel({ orgName }: { orgName: string }) {
+export function DeleteOrg({ orgName }: { orgName: string }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -203,21 +252,21 @@ export function DeleteOrgPanel({ orgName }: { orgName: string }) {
   const matches = typed.trim() === orgName;
 
   return (
-    <section className="bb-card mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-4">
-      <h2 className="text-xs font-semibold tracking-[0.15em] text-destructive uppercase">
-        Danger Zone
-      </h2>
-
+    <DangerRow
+      title="Delete organization"
+      blurb="Owner only. Removes the club and everything it has ever held."
+    >
       {!open ? (
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="min-h-tap mt-2 text-sm font-semibold text-destructive"
+          className="min-h-tap w-full rounded-md border border-destructive/40 px-4 text-sm
+                     font-semibold text-destructive active:bg-destructive/10"
         >
           Delete this organization
         </button>
       ) : (
-        <div className="mt-2">
+        <div>
           <p className="text-sm text-foreground">
             This deletes <strong>{orgName}</strong> and everything in it:
             every tryout class, athlete, rating, drill result, selection,
@@ -276,6 +325,6 @@ export function DeleteOrgPanel({ orgName }: { orgName: string }) {
           </div>
         </div>
       )}
-    </section>
+    </DangerRow>
   );
 }

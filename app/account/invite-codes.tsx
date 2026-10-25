@@ -17,10 +17,8 @@ export function InviteCodes({ codes }: { codes: InviteCode[] }) {
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <section className="mt-4">
-      <h2 className="text-xs font-semibold tracking-[0.15em] text-muted-foreground uppercase">
-        Invite Codes
-      </h2>
+    <div>
+      <h3 className="text-base font-bold text-foreground">Invite codes</h3>
       <p className="mt-1 text-xs text-muted-foreground">
         The code decides the role of whoever uses it. Admins are promoted from
         the members list, never invited by code.
@@ -40,7 +38,7 @@ export function InviteCodes({ codes }: { codes: InviteCode[] }) {
           <CodeRow key={c.role} code={c} onError={setError} />
         ))}
       </div>
-    </section>
+    </div>
   );
 }
 

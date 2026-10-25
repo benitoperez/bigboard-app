@@ -13,7 +13,7 @@ import { DeleteAllProspects } from "./delete-all";
 import { TryoutManager } from "./tryout-manager";
 import { MembersPanel } from "./members-panel";
 import { InviteCodes } from "./invite-codes";
-import { DeleteOrgPanel, OrgPanel } from "./org-panel";
+import { DeleteOrg, LeaveOrg, OrgPanel } from "./org-panel";
 import Link from "next/link";
 
 export const metadata: Metadata = { title: "Account - Big Board" };
@@ -57,6 +57,8 @@ export default async function AccountPage() {
     takenJerseys = (data ?? []).map((p) => p.jersey_number);
   }
 
+  const showRosterData = is_evaluator && template && tryout;
+
   return (
     <main className="safe-top safe-bottom px-6 py-8">
       <header>
@@ -66,134 +68,191 @@ export default async function AccountPage() {
         <h1 className="mt-1 text-4xl tracking-tight uppercase">Account</h1>
       </header>
 
-      {/* ---- Everyone: profile ---- */}
-      <section className="mt-6 bb-card rounded-lg border border-border bg-card p-4">
-        <p className="text-lg font-semibold text-foreground">
-          {profile?.display_name ?? "Unknown"}
-        </p>
-        <p className="mt-1 text-sm text-muted-foreground">{email}</p>
+      {/* Grouped by what the user is managing, in order of how often they
+          reach for it. Each group appears only when the role has something
+          in it - hiding is cosmetic; RLS and the RPCs enforce. */}
 
-        {/* The role is shown to everyone, not just admins: knowing why a
-            control is missing is the difference between "read-only" and
-            "broken". */}
-        <span className="mt-3 inline-block rounded-full bg-primary/15 px-3 py-1 text-xs font-bold tracking-wide text-primary uppercase">
-          {ROLE_LABELS[role]}
-        </span>
-        <p className="mt-2 text-xs text-muted-foreground">{ROLE_BLURBS[role]}</p>
-      </section>
-
-      {/* ---- Everyone: org name, switcher, leave. Rename is admin+. ---- */}
-      <OrgPanel
-        activeOrg={activeOrg}
-        memberships={memberships}
-        role={role}
-        isAdmin={is_admin}
-      />
-
-      {/* ---- Everyone reads the roster; admin+ gets the controls ---- */}
-      <MembersPanel members={members} myRole={role} myUserId={userId} />
-
-      {/* ---- Admin+: invite codes ---- */}
-      {is_admin && inviteCodes.length > 0 && <InviteCodes codes={inviteCodes} />}
-
-      {/* ---- Admin+: the template editor, on its own screen ---- */}
-      {is_admin && template && (
-        <Link
-          href="/account/template"
-          className="bb-card mt-4 flex min-h-tap-large items-center justify-between gap-3
-                     rounded-lg border border-border bg-card px-4 py-3 active:bg-secondary"
-        >
-          <span className="min-w-0">
-            <span className="block text-lg font-bold text-foreground">
-              Edit Evaluation Template
-            </span>
-            <span className="block truncate text-xs text-muted-foreground">
-              {template.positions.length} positions ·{" "}
-              {template.attributes.length} attributes · {template.drills.length}{" "}
-              drills
-            </span>
-          </span>
-          <span className="shrink-0 text-xl text-muted-foreground">&rsaquo;</span>
-        </Link>
-      )}
-
-      {/* ---- Admin+: tryout classes, import, destructive data controls ---- */}
-      <TryoutManager tryouts={tryouts} isAdmin={is_admin} />
-
-      {/* ---- Evaluator+: bulk import (SPEC-V2 section 10b.2) ---- */}
-      {is_evaluator && template && tryout && (
-        <section className="bb-card mt-4 rounded-lg border border-border bg-card p-4">
-          <h2 className="text-xl uppercase">Import Roster</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            A file, a photo of a printed sheet, or pasted text. Everything
-            lands in a review table first &mdash; nothing is saved until you
-            confirm it.
+      {/* ---- You ---- */}
+      <Group title="You">
+        <Card>
+          <p className="text-lg font-semibold text-foreground">
+            {profile?.display_name ?? "Unknown"}
           </p>
-          <div className="mt-3">
-            <ImportSheet
-              template={template}
-              orgId={activeOrg.orgId}
-              trigger={
-                <span
-                  className="min-h-tap-large flex w-full cursor-pointer items-center
-                             justify-center rounded-lg bg-primary px-6 text-base
-                             font-bold tracking-wide text-primary-foreground"
-                >
-                  Import a roster
-                </span>
-              }
-            />
+          <p className="mt-1 truncate text-sm text-muted-foreground">{email}</p>
+
+          {/* The role is shown to everyone, not just admins: knowing why a
+              control is missing is the difference between "read-only" and
+              "broken". */}
+          <div className="mt-4 border-t border-border pt-4">
+            <span className="inline-block rounded-full bg-primary/15 px-3 py-1 text-xs font-bold tracking-wide text-primary uppercase">
+              {ROLE_LABELS[role]}
+            </span>
+            <p className="mt-2 text-sm text-muted-foreground">{ROLE_BLURBS[role]}</p>
           </div>
-        </section>
-      )}
+        </Card>
+      </Group>
 
-      {/* ---- Admin+: export, then the destructive data controls ---- */}
-      {is_admin && (
-        <>
-          <section className="bb-card mt-4 rounded-lg border border-border bg-card p-4">
-            <h2 className="text-xl uppercase">Export</h2>
+      {/* ---- Organization: identity, people, invites ---- */}
+      <Group title="Organization">
+        <OrgPanel activeOrg={activeOrg} memberships={memberships} isAdmin={is_admin} />
+        <MembersPanel members={members} myRole={role} myUserId={userId} />
+        {is_admin && inviteCodes.length > 0 && <InviteCodes codes={inviteCodes} />}
+      </Group>
+
+      {/* ---- Tryouts: which class is live, and how it is scored ---- */}
+      <Group title="Tryouts">
+        <TryoutManager tryouts={tryouts} isAdmin={is_admin} />
+
+        {is_admin && template && (
+          <Link
+            href="/account/template"
+            className="bb-card flex min-h-tap-large items-center justify-between gap-3
+                       rounded-lg border border-border bg-card p-4 active:bg-secondary"
+          >
+            <span className="min-w-0">
+              <span className="block text-base font-bold text-foreground">
+                Evaluation template
+              </span>
+              <span className="mt-1 block truncate text-sm text-muted-foreground">
+                {template.positions.length} positions ·{" "}
+                {template.attributes.length} attributes · {template.drills.length}{" "}
+                drills
+              </span>
+            </span>
+            <span aria-hidden className="shrink-0 text-xl text-muted-foreground">
+              &rsaquo;
+            </span>
+          </Link>
+        )}
+      </Group>
+
+      {/* ---- Roster data: one way in, one way out ---- */}
+      {showRosterData && (
+        <Group title="Roster data">
+          <Card>
+            <h3 className="text-base font-bold text-foreground">Import roster</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              One row per athlete, with every drill, position rating and
-              attribute in this class. Admins only &mdash; an export carries
-              every rating every officer has given.
+              A file, a photo of a printed sheet, or pasted text. Everything
+              lands in a review table first &mdash; nothing is saved until you
+              confirm it.
             </p>
-            <div className="mt-3">
-              <ExportButton
-                scope="all"
-                label="Export this tryout class"
-                hint={`${takenJerseys.length} ${takenJerseys.length === 1 ? "athlete" : "athletes"} in ${tryout?.name ?? "the class"}.`}
-              />
-            </div>
-          </section>
-
-          {/* The older single-file panel stays: it carries the AI cleanup
-              path for a messy CSV that fails validation, which the new flow
-              deliberately does not duplicate. */}
-          {template && (
             <div className="mt-4">
-              <CsvImport
-                takenJerseys={takenJerseys}
+              <ImportSheet
                 template={template}
                 orgId={activeOrg.orgId}
+                trigger={
+                  <span
+                    className="min-h-tap-large flex w-full cursor-pointer items-center
+                               justify-center rounded-lg bg-primary px-6 text-base
+                               font-bold tracking-wide text-primary-foreground"
+                  >
+                    Import a roster
+                  </span>
+                }
               />
             </div>
+
+            {/* The plain-CSV path survives inside the same card rather than
+                as a second "Import Roster" panel: it carries the AI cleanup
+                for a messy CSV that fails validation, which the flow above
+                deliberately does not duplicate. */}
+            {is_admin && (
+              <details className="group mt-4 border-t border-border pt-4">
+                <summary
+                  className="flex min-h-tap cursor-pointer list-none items-center
+                             justify-between text-sm font-semibold text-foreground"
+                >
+                  Strict CSV import with AI cleanup
+                  <span
+                    aria-hidden
+                    className="text-muted-foreground transition-transform group-open:rotate-90"
+                  >
+                    &rsaquo;
+                  </span>
+                </summary>
+                <div className="mt-3">
+                  <CsvImport
+                    takenJerseys={takenJerseys}
+                    template={template}
+                    orgId={activeOrg.orgId}
+                  />
+                </div>
+              </details>
+            )}
+          </Card>
+
+          {is_admin && (
+            <Card>
+              <h3 className="text-base font-bold text-foreground">Export</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                One row per athlete, with every drill, position rating and
+                attribute in this class. Admins only &mdash; an export carries
+                every rating every officer has given.
+              </p>
+              <div className="mt-4">
+                <ExportButton
+                  scope="all"
+                  label="Export this tryout class"
+                  hint={`${takenJerseys.length} ${takenJerseys.length === 1 ? "athlete" : "athletes"} in ${tryout?.name ?? "the class"}.`}
+                />
+              </div>
+            </Card>
           )}
-          <DeleteAllProspects prospectCount={takenJerseys.length} />
-        </>
+        </Group>
       )}
 
-      {/* ---- Owner only: delete the org ---- */}
-      {role === "owner" && <DeleteOrgPanel orgName={activeOrg.orgName} />}
+      {/* ---- Danger zone: every irreversible action, in one place ---- */}
+      <Group title="Danger zone" tone="destructive">
+        <div
+          className="bb-card divide-y divide-border overflow-hidden rounded-lg border
+                     border-destructive/40 bg-card"
+        >
+          <LeaveOrg orgName={activeOrg.orgName} role={role} />
+          {is_admin && <DeleteAllProspects prospectCount={takenJerseys.length} />}
+          {role === "owner" && <DeleteOrg orgName={activeOrg.orgName} />}
+        </div>
+      </Group>
 
-      <form action={signOut} className="mt-8">
+      <form action={signOut} className="mt-10">
         <button
           type="submit"
-          className="min-h-tap-large w-full rounded-lg border border-destructive/40
-                     text-base font-bold text-destructive active:bg-destructive/10"
+          className="min-h-tap-large w-full rounded-lg border border-border
+                     text-base font-bold text-foreground active:bg-secondary"
         >
           Sign Out
         </button>
       </form>
     </main>
+  );
+}
+
+/** One titled group of Account settings. The spacing lives here, once. */
+function Group({
+  title,
+  tone = "default",
+  children,
+}: {
+  title: string;
+  tone?: "default" | "destructive";
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="mt-8">
+      <h2
+        className={
+          "text-xl tracking-tight uppercase " +
+          (tone === "destructive" ? "text-destructive" : "text-foreground")
+        }
+      >
+        {title}
+      </h2>
+      <div className="mt-3 flex flex-col gap-4">{children}</div>
+    </section>
+  );
+}
+
+function Card({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="bb-card rounded-lg border border-border bg-card p-4">{children}</div>
   );
 }

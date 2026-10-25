@@ -58,9 +58,9 @@ export function TryoutManager({
   }
 
   return (
-    <section className="mt-4 bb-card rounded-lg border border-border bg-card p-4">
+    <div className="bb-card rounded-lg border border-border bg-card p-4">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-xl uppercase">Active Tryout</h2>
+        <h3 className="text-base font-bold text-foreground">Active tryout class</h3>
         <span className="text-xs text-muted-foreground">
           {tryouts.length} {tryouts.length === 1 ? "class" : "classes"}
         </span>
@@ -170,7 +170,8 @@ export function TryoutManager({
                   setError(null);
                 }}
                 disabled={pending}
-                className="min-h-tap mt-2 text-xs font-semibold text-muted-foreground"
+                className="min-h-tap mt-3 w-full rounded-md border border-border px-4 text-sm
+                           font-semibold text-foreground active:bg-secondary disabled:opacity-50"
               >
                 Rename this class
               </button>
@@ -192,7 +193,7 @@ export function TryoutManager({
                 setError(null);
               }}
               disabled={pending}
-              className="min-h-tap mt-3 w-full rounded-md border border-border px-4 text-sm
+              className="min-h-tap mt-2 w-full rounded-md border border-border px-4 text-sm
                          font-semibold text-foreground active:bg-secondary disabled:opacity-50"
             >
               + New tryout class
@@ -200,6 +201,6 @@ export function TryoutManager({
           )}
         </>
       )}
-    </section>
+    </div>
   );
 }

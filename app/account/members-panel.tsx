@@ -35,11 +35,9 @@ export function MembersPanel({
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <section className="mt-4">
+    <div>
       <div className="flex items-baseline justify-between">
-        <h2 className="text-xs font-semibold tracking-[0.15em] text-muted-foreground uppercase">
-          Members
-        </h2>
+        <h3 className="text-base font-bold text-foreground">Members</h3>
         <span className="tnum text-xs text-muted-foreground">
           {members.length}
         </span>
@@ -65,7 +63,7 @@ export function MembersPanel({
           />
         ))}
       </ul>
-    </section>
+    </div>
   );
 }
 

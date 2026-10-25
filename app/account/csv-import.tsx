@@ -178,10 +178,17 @@ export function CsvImport({
     validateAndSet(sheet.rows, sheet.headers, fileName, csvText, original);
   }
 
+  // Example positions come from THIS template, so a track club never reads
+  // football codes and nothing here restates a position (CLAUDE.md rule 2).
+  const [firstPos, secondPos] = [...template.positions].sort(
+    (a, b) => a.sortOrder - b.sortOrder,
+  );
+
+  // No card or heading of its own: this renders inside the one Import Roster
+  // card on Account, as the plain-CSV path with AI cleanup.
   return (
-    <section className="bb-card rounded-lg border border-border bg-card p-4">
-      <h2 className="text-xl uppercase">Import Roster</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
+    <div>
+      <p className="text-sm text-muted-foreground">
         Required:{" "}
         <code className="text-foreground">{REQUIRED_COLUMNS.join(", ")}</code>.
       </p>
@@ -199,10 +206,25 @@ export function CsvImport({
 
       <p className="mt-2 text-sm text-muted-foreground">
         <code className="text-foreground">positions</code> is the multi-select
-        cell, quoted and comma separated &mdash;{" "}
-        <code className="text-foreground">&quot;WR, DB&quot;</code>. The first
-        value is their primary position. Labels like{" "}
-        <code className="text-foreground">R (Rush)</code> are fine.{" "}
+        cell, quoted and comma separated
+        {firstPos && secondPos && (
+          <>
+            {" "}&mdash;{" "}
+            <code className="text-foreground">
+              &quot;{firstPos.code}, {secondPos.code}&quot;
+            </code>
+          </>
+        )}
+        . The first value is their primary position.
+        {firstPos && (
+          <>
+            {" "}Labels like{" "}
+            <code className="text-foreground">
+              {firstPos.code} ({firstPos.label})
+            </code>{" "}
+            are fine.
+          </>
+        )}{" "}
         <code className="text-foreground">selected</code> accepts TRUE / 1 and
         puts them straight on the team list. Drill columns are optional and a
         blank cell means not measured. The whole file is checked before
@@ -344,7 +366,7 @@ export function CsvImport({
           </button>
         </div>
       )}
-    </section>
+    </div>
   );
 }
 

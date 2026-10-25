@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteAllProspects } from "./actions";
+import { DangerRow } from "./org-panel";
 
 /**
  * Clear the whole roster. Admin only.
@@ -37,53 +38,46 @@ export function DeleteAllProspects({ prospectCount }: { prospectCount: number })
 
   if (done !== null) {
     return (
-      <section className="mt-4 bb-card rounded-lg border border-border bg-card p-4">
-        <h2 className="text-xl uppercase">Roster cleared</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Deleted <span className="tnum font-bold">{done}</span> prospects and
-          everything attached to them.
-        </p>
+      <DangerRow
+        title="Roster cleared"
+        blurb={`Deleted ${done} prospects and everything attached to them.`}
+      >
         <button
           type="button"
           onClick={() => setDone(null)}
-          className="min-h-tap mt-3 w-full rounded-md border border-border text-sm font-semibold"
+          className="min-h-tap w-full rounded-md border border-border text-sm font-semibold"
         >
           Done
         </button>
-      </section>
+      </DangerRow>
     );
   }
 
   return (
-    <section className="bb-card mt-4 rounded-lg border border-destructive/30 bg-card p-4">
-      <h2 className="text-xl uppercase">Danger zone</h2>
-
+    <DangerRow
+      title="Clear roster"
+      blurb="Delete every prospect in the active tryout class, with all their ratings, drill results, selections and comments."
+    >
       {!open ? (
-        <>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Delete every prospect in this tryout, along with all their ratings,
-            40 times, selections, and comments.
-          </p>
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            disabled={prospectCount === 0}
-            className="min-h-tap mt-3 w-full rounded-md border border-destructive/40 px-4
-                       text-sm font-semibold text-destructive
-                       active:bg-destructive/10 disabled:opacity-40"
-          >
-            {prospectCount === 0
-              ? "No prospects to delete"
-              : `Delete all ${prospectCount} prospects`}
-          </button>
-        </>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          disabled={prospectCount === 0}
+          className="min-h-tap w-full rounded-md border border-destructive/40 px-4
+                     text-sm font-semibold text-destructive
+                     active:bg-destructive/10 disabled:opacity-40"
+        >
+          {prospectCount === 0
+            ? "No prospects to delete"
+            : `Delete all ${prospectCount} prospects`}
+        </button>
       ) : (
-        <div className="mt-2 rounded-md border border-destructive/50 bg-destructive/10 p-3">
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3">
           <p className="text-sm font-bold text-foreground">
             This deletes {prospectCount} prospects and cannot be undone.
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Every rating, 40 time, selection, comment, and headshot in this
+            Every rating, drill result, selection, comment, and headshot in this
             tryout goes with them. Type <strong className="text-foreground">DELETE</strong> to confirm.
           </p>
 
@@ -138,6 +132,6 @@ export function DeleteAllProspects({ prospectCount }: { prospectCount: number })
           </div>
         </div>
       )}
-    </section>
+    </DangerRow>
   );
 }
