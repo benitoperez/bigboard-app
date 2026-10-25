@@ -3,7 +3,12 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { DrillDetail } from "@/lib/data/prospect-detail";
-import { formatDrillValue } from "@/lib/template";
+import {
+  drillInputValue,
+  formatDrillValue,
+  parseDrillInput,
+  type TemplateDrill,
+} from "@/lib/template";
 import { saveDrillAttempt, deleteDrillAttempt } from "./drill-actions";
 
 /**
@@ -67,10 +72,9 @@ function DrillSection({
               <AttemptField
                 key={n}
                 prospectId={prospectId}
-                drillKey={drill.key}
-                decimals={drill.decimals}
+                drill={drill}
                 attemptNumber={n}
-                initial={existing ? existing.value.toFixed(drill.decimals) : ""}
+                initial={existing ? drillInputValue(drill, existing.value) : ""}
                 isBest={
                   existing != null && best != null && existing.value === best
                 }
@@ -128,15 +132,13 @@ function DrillSection({
 
 function AttemptField({
   prospectId,
-  drillKey,
-  decimals,
+  drill,
   attemptNumber,
   initial,
   isBest,
 }: {
   prospectId: string;
-  drillKey: string;
-  decimals: number;
+  drill: TemplateDrill;
   attemptNumber: number;
   initial: string;
   isBest: boolean;
@@ -146,6 +148,10 @@ function AttemptField({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const committedRef = useRef(initial);
+  const drillKey = drill.key;
+  // A clock-style placeholder for anything that runs past a minute, so an
+  // officer timing an 800 knows "2:05.3" is accepted.
+  const placeholder = drill.unit === "s" && drill.valueMax > 60 ? "m:ss.s" : "--.--";
 
   function commit() {
     const trimmed = value.trim();
@@ -181,7 +187,8 @@ function AttemptField({
         setError(res.error);
         return;
       }
-      committedRef.current = Number(trimmed).toFixed(decimals);
+      const parsed = parseDrillInput(drill, trimmed);
+      committedRef.current = parsed === null ? trimmed : drillInputValue(drill, parsed);
       setValue(committedRef.current);
       router.refresh();
     });
@@ -205,8 +212,10 @@ function AttemptField({
       <input
         id={fieldId}
         type="text"
-        inputMode="decimal"
-        placeholder="--.--"
+        // The phone decimal pad has no colon, so clock-style drills get the
+        // full keyboard. Plain seconds are still accepted either way.
+        inputMode={placeholder === "m:ss.s" ? "text" : "decimal"}
+        placeholder={placeholder}
         value={value}
         disabled={pending}
         onChange={(e) => setValue(e.target.value)}

@@ -11,8 +11,8 @@
  *   npm run verify:templates
  */
 
-import { BASEBALL, FLAG_FOOTBALL, SEEDS } from "./seed-templates";
-import { weightErrors } from "../lib/template";
+import { BASEBALL, FLAG_FOOTBALL, SEEDS, TRACK, VOLLEYBALL } from "./seed-templates";
+import { drillInputValue, parseDrillInput, weightErrors } from "../lib/template";
 
 let failures = 0;
 
@@ -200,6 +200,67 @@ check(
     .find((p) => p.code === "C")
     ?.components.filter((c) => c.kind === "drill").length,
   3,
+);
+
+// ---- Volleyball specifics ---------------------------------------------
+console.log("\n--- volleyball (migration-v2.3) ---");
+
+check(
+  "the libero is not rated on the vertical jump",
+  "a libero never attacks or blocks",
+  VOLLEYBALL.positions
+    .find((p) => p.code === "L")
+    ?.components.some((c) => c.kind === "drill"),
+  false,
+);
+
+check(
+  "vertical jump is higher_is_better",
+  "a higher jump is better, unlike a run time",
+  VOLLEYBALL.drills.find((d) => d.key === "vertical_jump")?.direction,
+  "higher_is_better",
+);
+
+// ---- Track specifics --------------------------------------------------
+console.log("\n--- track (migration-v2.3) ---");
+
+check(
+  "every track time is lower_is_better",
+  TRACK.drills.map((d) => d.key).join(", "),
+  TRACK.drills.every((d) => d.direction === "lower_is_better"),
+  true,
+);
+
+// A pure time event has no officer inputs. Any floor above 0 would gate
+// those events forever, which reads as missing data, not a bad template.
+check(
+  "track needs no officer inputs to show a rating",
+  "min_ratings_for_display gates on officer inputs; most events have none",
+  TRACK.minRatingsForDisplay,
+  0,
+);
+
+check(
+  "every event is at least 90% its own time",
+  "track ranks on times; acceleration is the only judged input",
+  TRACK.positions.every((p) =>
+    p.components.some((c) => c.kind === "drill" && c.weight >= 90),
+  ),
+  true,
+);
+
+// m:ss entry - an 800 is timed as 2:05.3, not 125.3.
+const eight = TRACK.drills.find((d) => d.key === "run_800m")!;
+check("m:ss parses to seconds", "2:05.3", parseDrillInput(eight, "2:05.3"), 125.3);
+check("plain seconds still parse", "125.3", parseDrillInput(eight, "125.3"), 125.3);
+check("seconds render back as m:ss", "125.3 s", drillInputValue(eight, 125.3), "2:05.3");
+check("rounding never shows :60", "119.96 s at 1 decimal", drillInputValue(eight, 119.96), "2:00.0");
+check("under a minute stays plain", "58.4 s", drillInputValue(eight, 58.4), "58.4");
+check(
+  "m:ss is rejected for a non-time drill",
+  "vertical jump in inches",
+  parseDrillInput(VOLLEYBALL.drills[0], "2:05"),
+  null,
 );
 
 console.log("\n" + "=".repeat(70));

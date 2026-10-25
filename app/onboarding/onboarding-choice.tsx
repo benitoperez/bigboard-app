@@ -19,15 +19,27 @@ const FIELD =
  */
 const TEMPLATES = [
   {
+    slug: "baseball",
+    name: "Baseball",
+    blurb: "9 positions, 60 yard dash, exit and throwing velocity.",
+    available: true,
+  },
+  {
     slug: "flag_football",
-    name: "Flag Football",
+    name: "Football (Flag Football)",
     blurb: "6 positions, 40 yard dash. The original Big Board setup.",
     available: true,
   },
   {
-    slug: "baseball",
-    name: "Baseball",
-    blurb: "9 positions, 60 yard dash, exit and throwing velocity.",
+    slug: "volleyball",
+    name: "Volleyball",
+    blurb: "5 positions, vertical jump, skills from serving to setting.",
+    available: true,
+  },
+  {
+    slug: "track",
+    name: "Track",
+    blurb: "Events from the 60 to the 3200, ranked on times.",
     available: true,
   },
   {
@@ -91,7 +103,7 @@ function BackButton({ onBack }: { onBack: () => void }) {
 
 function CreateOrgForm({ onBack }: { onBack: () => void }) {
   const [state, formAction, pending] = useActionState(createOrg, initialState);
-  const [template, setTemplate] = useState<string>("flag_football");
+  const [template, setTemplate] = useState<string>("baseball");
 
   return (
     <form action={formAction} className="mt-6 flex flex-col gap-4">
@@ -107,7 +119,7 @@ function CreateOrgForm({ onBack }: { onBack: () => void }) {
           type="text"
           required
           maxLength={80}
-          placeholder="NCSU Club Flag Football"
+          placeholder="NC State Club ___"
           className={FIELD}
         />
       </div>

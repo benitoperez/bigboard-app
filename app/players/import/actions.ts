@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getOfficer } from "@/lib/auth";
 import { getActiveTryout } from "@/lib/data/tryouts";
 import { getTemplateForTryout } from "@/lib/data/template";
-import { isPositionCode, type Template } from "@/lib/template";
+import { isPositionCode, parseDrillInput, type Template } from "@/lib/template";
 
 /** One reviewed row, as the table hands it back. */
 export type ReviewRow = {
@@ -293,7 +293,8 @@ function validateDrills(
         attempts.push(null);
         return;
       }
-      if (!/^\d{1,3}(\.\d{1,3})?$/.test(trimmed)) {
+      const n = parseDrillInput(drill, trimmed);
+      if (n === null) {
         issues.push({
           row: line,
           message: `${drill.label} "${trimmed}" (attempt ${i + 1}) is not a number.`,
@@ -301,7 +302,6 @@ function validateDrills(
         attempts.push(null);
         return;
       }
-      const n = Number(trimmed);
       if (!(n > drill.valueMin && n <= drill.valueMax)) {
         issues.push({
           row: line,

@@ -1,4 +1,4 @@
-import type { Template, TemplateDrill } from "@/lib/template";
+import { parseDrillInput, type Template, type TemplateDrill } from "@/lib/template";
 
 /**
  * Roster CSV validation - SPEC.md section 12.
@@ -267,7 +267,8 @@ export function validateRoster(
           attempts.push(null);
           continue;
         }
-        if (!/^\d{1,3}(\.\d{1,3})?$/.test(raw)) {
+        const v = parseDrillInput(drill, raw);
+        if (v === null) {
           errors.push({
             line,
             message: `${drill.label} "${raw}" (attempt ${n}) is not a number.`,
@@ -275,7 +276,6 @@ export function validateRoster(
           attempts.push(null);
           continue;
         }
-        const v = Number(raw);
         // The drill's own range, not a hardcoded 40-time window.
         if (!(v > drill.valueMin && v <= drill.valueMax)) {
           errors.push({

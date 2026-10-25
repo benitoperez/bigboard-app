@@ -24,10 +24,11 @@ import type {
   TemplatePosition,
 } from "../lib/template";
 
-const SQL = readFileSync(
-  resolve(import.meta.dirname, "..", "supabase", "migration-v2.sql"),
-  "utf8",
-);
+// Seeds live in more than one migration (append-only: later sports arrive
+// in later files), so every file that carries a seed block is read.
+const SQL = ["migration-v2.sql", "migration-v2.3.sql"]
+  .map((f) => readFileSync(resolve(import.meta.dirname, "..", "supabase", f), "utf8"))
+  .join("\n");
 
 /** Split one SQL tuple body into fields, respecting single-quoted strings. */
 function splitTuple(body: string): string[] {
@@ -177,4 +178,6 @@ function parseSeed(tag: string, sport: string): Template {
 
 export const FLAG_FOOTBALL = parseSeed("seed_flag", "flag_football");
 export const BASEBALL = parseSeed("seed_baseball", "baseball");
-export const SEEDS = [FLAG_FOOTBALL, BASEBALL];
+export const VOLLEYBALL = parseSeed("seed_volleyball", "volleyball");
+export const TRACK = parseSeed("seed_track", "track");
+export const SEEDS = [FLAG_FOOTBALL, BASEBALL, VOLLEYBALL, TRACK];

@@ -10,7 +10,13 @@ import { ACTIVE_ORG_COOKIE, normalizeInviteCode } from "@/lib/org";
 export type OnboardingState = { error: string | null };
 
 /** Seed templates a new org may start from. Basketball is not one yet. */
-const TEMPLATE_SLUGS = ["flag_football", "baseball", "scratch"] as const;
+const TEMPLATE_SLUGS = [
+  "baseball",
+  "flag_football",
+  "volleyball",
+  "track",
+  "scratch",
+] as const;
 type TemplateSlug = (typeof TEMPLATE_SLUGS)[number];
 
 function isTemplateSlug(v: string): v is TemplateSlug {

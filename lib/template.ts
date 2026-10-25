@@ -134,7 +134,38 @@ export function drillUnion(t: Template, codes: string[]): TemplateDrill[] {
  * not render three because a percentile computation produced them.
  */
 export function formatDrillValue(drill: TemplateDrill, value: number): string {
-  return `${value.toFixed(drill.decimals)}${drill.unit}`;
+  return `${drillInputValue(drill, value)}${drill.unit === "s" && value >= 60 ? "" : drill.unit}`;
+}
+
+/**
+ * A measured value as an officer would type it back in. A time of a minute
+ * or more reads as m:ss ("2:05.3", "10:42.0"), because nobody times an 800
+ * in seconds; everything else is a plain decimal.
+ */
+export function drillInputValue(drill: TemplateDrill, value: number): string {
+  if (drill.unit !== "s" || value < 60) return value.toFixed(drill.decimals);
+  // Round first, so 119.96 at one decimal becomes 2:00.0, never 1:60.0.
+  const scale = 10 ** drill.decimals;
+  const rounded = Math.round(value * scale) / scale;
+  const minutes = Math.floor(rounded / 60);
+  const seconds = (rounded - minutes * 60).toFixed(drill.decimals);
+  return `${minutes}:${seconds.padStart(drill.decimals > 0 ? drill.decimals + 3 : 2, "0")}`;
+}
+
+/**
+ * Parse one typed or imported drill value. Accepts a plain decimal for any
+ * drill and, for a time ("s") drill, m:ss with optional fractional seconds.
+ * Returns null when the text is not a number at all; the RANGE check stays
+ * with the caller, which has its own error wording.
+ */
+export function parseDrillInput(drill: TemplateDrill, raw: string): number | null {
+  const trimmed = raw.trim();
+  if (/^\d{1,4}(\.\d{1,3})?$/.test(trimmed)) return Number(trimmed);
+  const clock = /^(\d{1,2}):([0-5]\d)(\.\d{1,3})?$/.exec(trimmed);
+  if (drill.unit === "s" && clock) {
+    return Number(clock[1]) * 60 + Number(`${clock[2]}${clock[3] ?? ""}`);
+  }
+  return null;
 }
 
 /** Human label for a component, for progress lines and the weight editor. */

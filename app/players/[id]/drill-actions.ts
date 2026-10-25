@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getOfficer } from "@/lib/auth";
 import { getTemplateForTryout } from "@/lib/data/template";
-import { getDrill, type TemplateDrill } from "@/lib/template";
+import { getDrill, parseDrillInput, type TemplateDrill } from "@/lib/template";
 
 export type DrillResult = { ok: true } | { ok: false; error: string };
 
@@ -79,12 +79,11 @@ export async function saveDrillAttempt(
     return { ok: false, error: `Attempt must be 1 to ${drill.maxAttempts}.` };
   }
 
-  const trimmed = raw.trim();
-  if (!/^\d{1,3}(\.\d{1,3})?$/.test(trimmed)) {
+  const value = parseDrillInput(drill, raw);
+  if (value === null) {
     return { ok: false, error: `Enter a ${drill.label.toLowerCase()} value.` };
   }
 
-  const value = Number(trimmed);
   // The range is the drill's own, not a hardcoded 40-time window: a 40 runs
   // 0-20 seconds and an exit velocity runs 0-130 mph.
   if (!(value > drill.valueMin && value <= drill.valueMax)) {
