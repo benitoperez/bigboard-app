@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { LoginForm } from "./login-form";
 
@@ -14,9 +15,16 @@ export default async function LoginPage({
   return (
     <main className="safe-top safe-bottom flex min-h-dvh flex-col justify-center px-6 py-12">
       <div className="mx-auto w-full max-w-sm">
-        <header className="mb-10">
-          <h1 className="mt-1 text-5xl tracking-tight text-foreground uppercase">
-            Big Board
+        <header className="mb-10 flex flex-col items-center text-center">
+          <h1>
+            <Image
+              src="/logo.png"
+              alt="Big Board"
+              width={640}
+              height={614}
+              priority
+              className="h-auto w-40"
+            />
           </h1>
         </header>
 
