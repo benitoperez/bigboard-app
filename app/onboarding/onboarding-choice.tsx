@@ -56,8 +56,12 @@ const TEMPLATES = [
   },
 ] as const;
 
-export function OnboardingChoice() {
-  const [path, setPath] = useState<"none" | "create" | "join">("none");
+export function OnboardingChoice({
+  initialPath = "none",
+}: {
+  initialPath?: "none" | "join";
+}) {
+  const [path, setPath] = useState<"none" | "create" | "join">(initialPath);
 
   if (path === "create") return <CreateOrgForm onBack={() => setPath("none")} />;
   if (path === "join") return <JoinOrgForm onBack={() => setPath("none")} />;

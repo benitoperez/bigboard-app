@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { JOIN_INTENT_COOKIE } from "@/lib/join-intent";
 
 export type SignupState = { error: string | null };
 
@@ -62,6 +63,20 @@ export async function signUp(
       };
     }
     return { error: "Could not create that account. Check the address and try again." };
+  }
+
+  // Remember that they came to join a club, so onboarding opens on the
+  // invite-code form. A cookie rather than a query on the confirmation link:
+  // the link's shape is set by the Supabase email template, not by us. If
+  // they confirm in another browser it is simply absent, and onboarding
+  // shows both choices as usual.
+  if (formData.get("join") === "1") {
+    (await cookies()).set(JOIN_INTENT_COOKIE, "1", {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/onboarding",
+      maxAge: 60 * 60 * 24,
+    });
   }
 
   revalidatePath("/", "layout");

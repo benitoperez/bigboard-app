@@ -8,7 +8,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * list. /auth holds the confirmation callback, which by definition runs
  * before a session exists.
  */
-const PUBLIC_PATHS = ["/login", "/signup", "/confirm-email", "/auth"];
+const PUBLIC_PATHS = ["/welcome", "/login", "/signup", "/confirm-email", "/auth"];
 
 /**
  * Refreshes the Supabase session on every request and gates the app.
@@ -66,18 +66,25 @@ export async function updateSession(request: NextRequest) {
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    // Send them back where they were headed once they sign in.
-    url.searchParams.set("next", request.nextUrl.pathname);
+    // The bare root is a first visit, so it gets the welcome screen. A deep
+    // link is someone who already has an account, so it goes to sign-in and
+    // comes back where they were headed.
+    if (request.nextUrl.pathname === "/") {
+      url.pathname = "/welcome";
+    } else {
+      url.pathname = "/login";
+      url.searchParams.set("next", request.nextUrl.pathname);
+    }
     return NextResponse.redirect(url);
   }
 
-  // Already signed in and sitting on the login or signup page - send them
+  // Already signed in and sitting on the welcome, login or signup page - send them
   // home. The confirmation screens are excluded: a signed-in but
   // unconfirmed account genuinely belongs on /confirm-email.
   if (
     user &&
-    (request.nextUrl.pathname.startsWith("/login") ||
+    (request.nextUrl.pathname.startsWith("/welcome") ||
+      request.nextUrl.pathname.startsWith("/login") ||
       request.nextUrl.pathname.startsWith("/signup"))
   ) {
     const url = request.nextUrl.clone();

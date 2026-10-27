@@ -11,11 +11,14 @@ const TABS = [
   { href: "/account", label: "Account", icon: AccountIcon },
 ] as const;
 
+const NO_TABS = ["/welcome", "/login", "/signup", "/confirm-email", "/onboarding"];
+
 export function TabBar() {
   const pathname = usePathname();
 
-  // No chrome on the login screen - there is nowhere to navigate to yet.
-  if (pathname.startsWith("/login")) return null;
+  // No chrome before someone has a club - there is nowhere to navigate to
+  // yet, and every tab would just bounce them back here.
+  if (NO_TABS.some((p) => pathname.startsWith(p))) return null;
 
   return (
     <nav

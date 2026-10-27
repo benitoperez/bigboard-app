@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { JOIN_INTENT_COOKIE } from "@/lib/join-intent";
 import { getOfficer } from "@/lib/auth";
 import { signOut } from "@/app/login/actions";
 import { OnboardingChoice } from "./onboarding-choice";
@@ -16,9 +18,11 @@ export const metadata: Metadata = { title: "Get Started - Big Board" };
 export default async function OnboardingPage() {
   const { gate, profile, memberships } = await getOfficer();
 
-  if (gate === "signed-out") redirect("/login");
+  if (gate === "signed-out") redirect("/welcome");
   if (gate === "unconfirmed") redirect("/confirm-email");
   if (memberships.length > 0) redirect("/");
+
+  const joining = (await cookies()).get(JOIN_INTENT_COOKIE)?.value === "1";
 
   return (
     <main className="safe-top safe-bottom flex min-h-dvh flex-col justify-center px-6 py-12">
@@ -45,7 +49,7 @@ export default async function OnboardingPage() {
           </p>
         )}
 
-        <OnboardingChoice />
+        <OnboardingChoice initialPath={joining ? "join" : "none"} />
 
         <form action={signOut} className="mt-10">
           <button

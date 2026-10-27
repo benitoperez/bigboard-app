@@ -10,11 +10,12 @@ const FIELD =
   "text-foreground outline-none " +
   "focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/40";
 
-export function SignupForm() {
+export function SignupForm({ joining = false }: { joining?: boolean }) {
   const [state, formAction, pending] = useActionState(signUp, initialState);
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
+      {joining && <input type="hidden" name="join" value="1" />}
       <div className="flex flex-col gap-2">
         <label htmlFor="display_name" className="text-sm font-semibold text-muted-foreground">
           Your name

@@ -15,6 +15,13 @@ export default async function LoginPage({
   return (
     <main className="safe-top safe-bottom flex min-h-dvh flex-col justify-center px-6 py-12">
       <div className="mx-auto w-full max-w-sm">
+        <Link
+          href="/welcome"
+          className="min-h-tap -ml-2 mb-6 inline-flex items-center px-2 text-sm
+                     font-semibold text-muted-foreground"
+        >
+          &lsaquo; Back
+        </Link>
         <header className="mb-10 flex flex-col items-center text-center">
           <h1>
             <Image

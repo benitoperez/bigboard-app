@@ -177,7 +177,7 @@ export async function requireOrg(): Promise<Actor> {
 
   switch (actor.gate) {
     case "signed-out":
-      redirect("/login");
+      redirect("/welcome");
     case "unconfirmed":
       redirect("/confirm-email");
     case "no-profile":
